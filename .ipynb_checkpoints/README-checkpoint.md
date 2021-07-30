@@ -4,11 +4,15 @@
 
 The purpose of device is to streamline and versitalize your laboratory workflow. This document will guide you through the prerequisites and use of this library.
 
-## Installation
+## Prerequisites
 
-To install simply type in 
+This library will require you download the packages in labinstruments-packages.txt. To do so use the following command:
 
-    pip install QNCP
+    pip install labinstruments-packages.txt
+    
+or if conda is used:
+
+    conda install labinstruments-packages.txt
     
 ## Instruments 
 

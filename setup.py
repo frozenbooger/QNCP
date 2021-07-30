@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='QNCP',
-    version='1.0',
+    version='1.0.1',
     license='MIT',
     author="Leonardo Castillo",
     author_email='frozenbooger@gmail.com',

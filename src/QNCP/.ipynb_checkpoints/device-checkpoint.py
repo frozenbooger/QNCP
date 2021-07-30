@@ -19,7 +19,6 @@ import pyvisa
 from pyvisa.constants import Parity,StopBits
 import numpy as np
 import matplotlib.pyplot as plt
-from mogdevice import MOGDevice
 import re
 import math
 from scipy.signal import find_peaks

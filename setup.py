@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='QNCP',
-    version='0.2',
+    version='1.0',
     license='MIT',
     author="Leonardo Castillo",
     author_email='frozenbooger@gmail.com',
@@ -13,7 +13,6 @@ setup(
     keywords='Quantum Network Control Panel',
     install_requires=[
         'matplotlib',
-        'multiprocessing',
         'numpy',
         'numpydoc',
         'paramiko',
@@ -21,7 +20,6 @@ setup(
         'PyVISA',
         'PyVISA-py',
         'regex',
-        'scikit-learn',
         'scipy',
         'scp',
         'visa'],

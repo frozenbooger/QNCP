@@ -12,7 +12,6 @@ setup(
     url='https://github.com/frozenbooger/QNCP',
     keywords='Quantum Network Control Panel',
     install_requires=[
-        'scikit-learn',
         'matplotlib',
         'multiprocessing',
         'numpy',

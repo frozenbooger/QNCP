@@ -1,12 +1,14 @@
 scikit-learn
 matplotlib
-multiprocessingnumpy
+multiprocessing
+numpy
 numpydoc
 paramiko
 pyvis
 PyVISA
 PyVISA-py
-regexscikit-learn
+regex
+scikit-learn
 scipy
 scp
 visa

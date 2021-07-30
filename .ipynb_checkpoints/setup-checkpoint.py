@@ -3,10 +3,10 @@ from setuptools import setup, find_packages
 
 setup(
     name='QNCP',
-    version='0.1',
+    version='0.2',
     license='MIT',
-    author="Leonardo Castillo Veneors",
-    author_email='leonardo.castilloveneors@stonybrook.edu',
+    author="Leonardo Castillo",
+    author_email='frozenbooger@gmail.com',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     url='https://github.com/frozenbooger/QNCP',

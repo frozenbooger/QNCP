@@ -3,6 +3,7 @@ setup.cfg
 setup.py
 src/QNCP/__init__.py
 src/QNCP/device.py
+src/QNCP/search.py
 src/QNCP.egg-info/PKG-INFO
 src/QNCP.egg-info/SOURCES.txt
 src/QNCP.egg-info/dependency_links.txt

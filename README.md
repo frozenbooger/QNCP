@@ -30,8 +30,12 @@ The different instruments supported by this library are divided into the followi
     
 For example calling the Rigol DSG830 to change its output frequency to 50 Mhz is as follows:
 
-    gen.Rigol_DSG830.freq(50)
-    
-In general:
+	from QNCP import device
 
-    type.instrument.command(input)
+    device.Rigol_DSG830.freq(50)
+    
+This library also has a search functionality for USB (ASRL, GBIP) devices. We can search as follows:
+
+	from QNCP import search, device
+
+	print(search.get_resource('ASRL',device.Quantum_Composers,38400))

@@ -3,9 +3,9 @@ from setuptools import setup, find_packages
 
 setup(
     name='QNCP',
-    version='1.1.1',
+    version='1.1.2',
     license='MIT',
-    author="Leonardo Castillo",
+    author="Leonardo Castillo Veneros",
     author_email='frozenbooger@gmail.com',
     packages=find_packages('src'),
     package_dir={'': 'src'},

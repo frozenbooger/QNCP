@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import re
 import math
 from scipy.signal import find_peaks
+import inspect
 #================================================================
 # Valon_5015('Pete' or 'Ringo')
 #================================================================
@@ -189,9 +190,14 @@ class Rigol_DG4202:
     
     def arb(self,ch,ν,func,*arg):
         total_time = 1/(self.__Hz(ν))
-        t = np.linspace(0,total_time,1000)
-        data = func(t,*arg)
-        datastring = ",".join(map(str,data))
+        
+        if inspect.ismethod(func) == True:
+            t = np.linspace(0,total_time,1000)
+            data = func(t,*arg)
+            datastring = ",".join(map(str,data))
+        else:
+            datasting = func
+        
         self.dev.write("SOURCE{}:BURST OFF".format(ch))
         self.dev.write("OUTPUT{} ON".format(ch))
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
@@ -209,10 +215,14 @@ class Rigol_DG4202:
     
     def arb_burst(self,ch,ν,cycles,func,*arg):
         total_time = 1/(self.__Hz(ν))
-        print(total_time)
-        t = np.linspace(0,total_time,1000)
-        data = func(t,*arg)    
-        datastring = ",".join(map(str,data))
+        
+        if inspect.ismethod(func) == True:
+            t = np.linspace(0,total_time,1000)
+            data = func(t,*arg)
+            datastring = ",".join(map(str,data))
+        else:
+            datasting = func
+        
         self.dev.write("*RST")
         self.dev.write("OUTPUT{} ON".format(ch))
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)

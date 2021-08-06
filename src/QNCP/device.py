@@ -196,7 +196,8 @@ class Rigol_DG4202:
             data = func(t,*arg)
             datastring = ",".join(map(str,data))
         else:
-            datasting = func
+            data = func
+            datastring = ",".join(map(str,data))
         
         self.dev.write("SOURCE{}:BURST OFF".format(ch))
         self.dev.write("OUTPUT{} ON".format(ch))
@@ -221,7 +222,8 @@ class Rigol_DG4202:
             data = func(t,*arg)
             datastring = ",".join(map(str,data))
         else:
-            datasting = func
+            data = func
+            datastring = ",".join(map(str,data))
         
         self.dev.write("*RST")
         self.dev.write("OUTPUT{} ON".format(ch))

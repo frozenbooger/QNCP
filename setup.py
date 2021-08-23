@@ -3,9 +3,9 @@ from setuptools import setup, find_packages
 
 setup(
     name='QNCP',
-    version='1.1.4',
+    version='1.1.8.1',
     license='MIT',
-    author="Leonardo Castillo Veneros",
+    author="Leonardo Castillo Veneros and Guodong Cui",
     author_email='frozenbooger@gmail.com',
     packages=find_packages('src'),
     package_dir={'': 'src'},
@@ -22,6 +22,7 @@ setup(
         'regex',
         'scipy',
         'scp',
-        'visa'],
+        'visa',
+        'python-vxi11'],
 
 )

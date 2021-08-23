@@ -23,6 +23,7 @@ import re
 import math
 from scipy.signal import find_peaks
 import inspect
+import vxi11
 #================================================================
 # Valon_5015('Pete' or 'Ringo')
 #================================================================
@@ -84,10 +85,14 @@ class Valon_5015:
 #================================================================
 
 class Rigol_DSG830:
-    def __init__(self,address): #'TCPIP::<IP ADDRESS>::INSTR'
-        self.address = address
-        self.rm = pyvisa.ResourceManager()
-        self.dev = self.rm.open_resource(self.address)
+    def __init__(self,address,*arg):
+        if arg:
+            self.address = address #'TCPIP::<IP ADDRESS>::INSTR'
+            self.dev = vxi11.Instrument(self.address)
+        else:
+            self.address = address 
+            self.rm = pyvisa.ResourceManager()
+            self.dev = self.rm.open_resource(self.address)
      
     def off(self):
         self.dev.write(':OUTput OFF;')  # turn on RF output
@@ -123,13 +128,20 @@ class Rigol_DSG830:
             return __lev
             
 #================================================================
-# Rigol_DG4202 (1.0 tested)
+# Rigol_DG4202 (1.2 tested)
 #================================================================
 class Rigol_DG4202:
-    def __init__(self,address):
-        self.address = address #'TCPIP::<IP ADDRESS>::INSTR'
-        self.rm = pyvisa.ResourceManager()
-        self.dev = self.rm.open_resource(self.address)
+    def __init__(self,address,*arg):
+        if arg:
+            self.address = address #'TCPIP::<IP ADDRESS>::INSTR'
+            self.dev = vxi11.Instrument(self.address)
+        else:
+            self.address = address 
+            self.rm = pyvisa.ResourceManager()
+            self.dev = self.rm.open_resource(self.address)
+        
+    def reset(self): #Reset
+        self.dev.write("*RST")
         
     def off(self,*ch):  # default: both
         if bool(ch) == True: # turn single output off
@@ -225,7 +237,6 @@ class Rigol_DG4202:
             data = func
             datastring = ",".join(map(str,data))
         
-        self.dev.write("*RST")
         self.dev.write("OUTPUT{} ON".format(ch))
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
         self.dev.write("SOURCE{}:VOLTAGE:UNIT VRMS".format(ch))
@@ -437,7 +448,9 @@ class MOGDevice:
             if val is not None: self.dev.settimeout(val)
             return old
 
-        
+#===========================================================================
+# MOGLabs
+#===========================================================================         
 
 class MOGLabs:
     def __init__(self,address): #<IP ADDRESS>
@@ -535,7 +548,7 @@ class Rigol_DS1102Z_E:
 # Quantum_Composer (1.0 tested)
 #===========================================================================
 class Quantum_Composers:
-    def __init__(self,address,baud_rate = 38400):#'ASRL<>::INSTR'
+    def __init__(self,address,baud_rate = 38400):
         self.address = address
         self.baud_rate = baud_rate
         self.rm = pyvisa.ResourceManager()
@@ -547,7 +560,17 @@ class Quantum_Composers:
         self.mux_reset()   # clear all multiplexer
         self.lev()    # set all outputs to TTL
         self.dev.clear()
-
+    def t0(self,t):  # clock T0
+        self.dev.write(':PULSE0:PER {}'.format(t))
+    def norm(self,*ch):   # normal mode, no wait
+        if bool(ch) == True:  # specified channel
+            for __ch in ch:
+                self.dev.write(':Pulse{}:CMODe NORMal'.format(__ch))
+                self.wcount(__ch,0)
+        else:
+            for __ch in range(1,9):  # all channels
+                self.dev.write(':Pulse{}:CMODe NORMal'.format(__ch))
+                self.wcount(__ch,0)
     def wid(self,ch,w):
         self.dev.write(':PULSE{}:WIDth {}'.format(ch,w))
     def dly(self,ch,d):
@@ -898,3 +921,120 @@ class Agilent_ESG_SG:
     def phase(self,phase,unit): #define phase and unit {radian,degrees}
         self.dev.write(':PHASe {} {}'.format(phase,unit))
 
+#================================================================
+# Tektronix AFG3000 Series Arbitrary Function Generator
+#================================================================
+
+class Tektronix_AFG3000:
+    def __init__(self,address,*arg):
+        if arg:
+            self.address = address #'TCPIP::<IP ADDRESS>::INSTR'
+            self.dev = vxi11.Instrument(self.address)
+        else:
+            self.address = address 
+            self.rm = pyvisa.ResourceManager()
+            self.dev = self.rm.open_resource(self.address)
+        
+    def reset(self): #Reset
+        self.dev.write("*RST")
+        
+    def off(self):  # default: both
+        self.dev.write(':OUTPut OFF')
+            
+    def on(self): # default: both 
+        self.dev.write(':OUTPut ON')
+
+    def freq(self,ch,f):
+        self.dev.write(':SOURCe{}:Freq:FIXed {}'.format(ch,self.__Hz(f)));
+
+    def __Hz(self,f):  # in Hz, support unit. Default: MHz
+        if type(f) == str:
+            if re.search('[mM]',f) != None:
+                return 1e6*float(re.sub('[a-zA-Z]','',f))
+            elif re.search('[kK]',f) != None:
+                return 1e3*float(re.sub('[a-zA-Z]','',f))
+            elif re.search('[hH]',f) != None:
+                return 1*float(re.sub('[a-zA-Z]','',f))
+        else: # float, or str that contains only numbers
+            return float(f)*1e6
+
+    def lev(self,ch,v):
+        if type(v) == str:
+            __V = float(re.sub('[a-zA-Z]','',v))  # unitless value
+            if re.search('[rR]',v) != None:  #  VRMS
+                self.dev.write(':SOURCe{}:VOLTage:UNIT VRMS'.format(ch))
+            elif re.search('[dD]',v) != None:  # dBm
+                self.dev.write(':SOURCe{}:VOLTage:UNIT DBM'.format(ch))
+        else:  # default: [Vpp] 
+            __V = v
+            self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
+
+        self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,__V))
+        self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
+
+    def offset(self,ch,o):  # V_DC
+        self.dev.write(':SOURCe{}:VOLTage:OFFSet {}'.format(ch,o));
+
+    def phase(self,ch,p):
+        self.dev.write(':SOURCe{}:PHASe {}'.format(ch,p));
+        
+    def gaussian(self,t,mu,FWHM,a): #Gaussian Function. Inputs: (FWHM, Amplitude, Center)
+        sigma = (FWHM)/(2*np.sqrt(2*np.log(2)))
+        amplitude = np.sqrt(2*np.pi*sigma**2)*a
+        return amplitude*( 1/(sigma * np.sqrt(2*np.pi) ) )*np.exp( -((t-mu)**2 / (2*sigma**2)) )
+    
+    def square(self,t,leadingedge,width,amp): #square pulse with duty cycle
+        return np.piecewise(t,[(t<=leadingedge),((t>leadingedge) & (t<leadingedge+width)),(t>=leadingedge+width)],[0,amp,0])
+    
+    def arb(self,ch,ν,func,*arg):
+        total_time = 1/(self.__Hz(ν))
+        
+        if inspect.ismethod(func) == True:
+            t = np.linspace(0,total_time,1000)
+            data = func(t,*arg)
+            datastring = ",".join(map(str,data))
+        else:
+            data = func
+            datastring = ",".join(map(str,data))
+        
+        self.dev.write("SOURCE{}:BURST OFF".format(ch))
+        self.dev.write("OUTPUT{} ON".format(ch))
+        self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
+        self.dev.write("SOURCE{}:VOLTAGE:UNIT VRMS".format(ch))
+        self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(ν)))
+        self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
+        self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)*2))
+        self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
+        self.dev.write("SOURCE{}:PHASE 0".format(ch))
+        self.dev.write("SOURCE{}:PERIOD {}".format(ch,total_time))
+        self.dev.write("SOURCE{}:PHASE:INIT".format(ch))
+    
+    def ext_trig(self):
+        self.dev.write("TRIGger:SEQuence:SOURce EXTernal")
+    
+    def arb_burst(self,ch,ν,cycles,func,*arg):
+        total_time = 1/(self.__Hz(ν))
+        
+        if inspect.ismethod(func) == True:
+            t = np.linspace(0,total_time,1000)
+            data = func(t,*arg)
+            datastring = ",".join(map(str,data))
+        else:
+            data = func
+            datastring = ",".join(map(str,data))
+        
+        self.dev.write("OUTPUT{} ON".format(ch))
+        self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
+        self.dev.write("SOURCE{}:VOLTAGE:UNIT VRMS".format(ch))
+        self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(ν)))
+        self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
+        self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)*2))
+        self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
+        self.dev.write("SOURCE{}:PHASE 0".format(ch))
+        self.dev.write("SOURCE{}:PERIOD {}".format(ch,total_time))
+        self.dev.write("SOURCE{}:PHASE:SYNC".format(ch))
+        
+        #triggered burst
+        self.dev.write("SOURCE{}:BURST ON".format(ch))
+        self.dev.write("SOURCE{}:BURST:NCYC {}".format(ch,cycles))
+        self.dev.write("SOURCE{}:BURST:MODE:TRIG".format(ch))

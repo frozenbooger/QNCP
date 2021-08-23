@@ -9,3 +9,4 @@ regex
 scipy
 scp
 visa
+python-vxi11

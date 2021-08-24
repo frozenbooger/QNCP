@@ -1,4 +1,4 @@
-###################################################################
+    ###################################################################
 # device information and importation
 # v1.0 (1) quantum composers on(*) off(*) multi channels; (2) bool()==True;
 # v1.1 (1) qc.config('CEIT') quTAU trigger for each pulse. (2) qc rm.open_resource problem
@@ -559,7 +559,7 @@ class Quantum_Composers:
                               stop_bits = StopBits.one)
         self.mux_reset()   # clear all multiplexer
         self.lev()    # set all outputs to TTL
-        self.dev.clear()
+        
     def t0(self,t):  # clock T0
         self.dev.write(':PULSE0:PER {}'.format(t))
     def norm(self,*ch):   # normal mode, no wait
@@ -1038,3 +1038,63 @@ class Tektronix_AFG3000:
         self.dev.write("SOURCE{}:BURST ON".format(ch))
         self.dev.write("SOURCE{}:BURST:NCYC {}".format(ch,cycles))
         self.dev.write("SOURCE{}:BURST:MODE:TRIG".format(ch))
+        
+#===========================================================================
+# Oscilloscope DS1104
+#===========================================================================            
+class Rigol_DS1104:
+    def __init__(self,address):
+        self.address = address
+        self.rm = pyvisa.ResourceManager()
+        self.dev = self.rm.open_resource(self.address)
+        self.run()
+
+    def meas(self,ch,var):  # measure 
+        if type(ch) == str:  # channel info
+            __ch = re.search('\d',ch).group()
+        else:
+            __ch = ch
+        
+        __readOut = self.dev.query(':MEASure:ITEM? {}, CHAN{}'.format(var,__ch))
+        __value = float(re.search('.*(?=\n)',__readOut).group())
+        return __value
+    
+    def run(self):
+        self.dev.write(':RUN')
+    def stop(self):
+        self.dev.write(':STOP')
+    def single(self):
+        self.dev.write(':SINGle')
+    
+    def screenshot(self,ch):
+        
+        print(self.dev.query(":TIM:SCAL?"))
+        print(self.dev.query(":TIM:OFFS?"))
+              
+        print(self.dev.query(":CHAN{}:SCAL?".format(ch)))
+        print(self.dev.query(":CHAN{}:OFFS?".format(ch)))
+        
+        timescale = float(self.dev.query(":TIM:SCAL?"))        
+        timeoffset = float(self.dev.query(":TIM:OFFS?")[0])# Get the timescale offset
+        voltscale = float(self.dev.query(":CHAN{}:SCAL?".format(ch)))
+        voltoffset = float(str(self.dev.query(":CHAN{}:OFFS?".format(ch))))  # And the voltage offset
+        
+        self.dev.write(":WAV:SOUR: CHAN{}".format(ch))
+        self.dev.write(":WAV:POIN:MODE NORM")
+        self.dev.write(":WAV:DATA? CHAN{}".format(ch))
+        rawdata = self.dev.read_raw() #1024 data
+        rawdata = rawdata[11:]
+
+        data = np.frombuffer(rawdata, 'B')
+
+        print(len(data))
+        # Walk through the data, and map it to actual voltages
+        data = data + 254
+        data = data[:-1]
+
+        # Now, we know from experimentation that the scope display range is actually
+        # 30-229.  So shift by 130 - the voltage offset in counts, then scale to
+        # get the actual voltage.
+        data = (data - 130.0 - voltoffset/voltscale*25) / 25 * voltscale
+        
+        return data

@@ -1068,12 +1068,6 @@ class Rigol_DS1104:
     
     def screenshot(self,ch):
         
-        print(self.dev.query(":TIM:SCAL?"))
-        print(self.dev.query(":TIM:OFFS?"))
-              
-        print(self.dev.query(":CHAN{}:SCAL?".format(ch)))
-        print(self.dev.query(":CHAN{}:OFFS?".format(ch)))
-        
         timescale = float(self.dev.query(":TIM:SCAL?"))        
         timeoffset = float(self.dev.query(":TIM:OFFS?")[0])# Get the timescale offset
         voltscale = float(self.dev.query(":CHAN{}:SCAL?".format(ch)))
@@ -1086,8 +1080,7 @@ class Rigol_DS1104:
         rawdata = rawdata[11:]
 
         data = np.frombuffer(rawdata, 'B')
-
-        print(len(data))
+        
         # Walk through the data, and map it to actual voltages
         data = data + 254
         data = data[:-1]

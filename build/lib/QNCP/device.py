@@ -1,20 +1,3 @@
-    ###################################################################
-# device information and importation
-# v1.0 (1) quantum composers on(*) off(*) multi channels; (2) bool()==True;
-# v1.1 (1) qc.config('CEIT') quTAU trigger for each pulse. (2) qc rm.open_resource problem
-# v1.2 (1) qc baud_rate = self.baud_rate
-# v2.0 (1) add feedback from oscilloscopes
-# v2.1 (1) created config: d2 photon no wait 
-# v2.2 (1) clear up quantum composers for each config; (2) MOT off before trigger; 
-# v2.3 (1) qc multiplexer
-# v2.4 (1) qc.config('fluorescence, ...')
-# v2.5 (1) qc.lev(*p)
-# v2.6 (1) improve feedback from oscilloscopes
-# v2.7 (1) Valon_5015('Pete'/'Ringo')
-# v3.1 (1) Static IP; (2) Rigol_DG4202('Pete' or 'Ringo'); (3) Valon_5015('Pete' or 'Ringo')
-# v3.2 (1) Rigol_DSA832
-# v3.3 (1) Added Agilent ESG Signal Generator Family and added monitoring capabilities to Rigol_DSA832 
-###################################################################
 import pyvisa
 from pyvisa.constants import Parity,StopBits
 import numpy as np
@@ -547,21 +530,45 @@ class Rigol_DS1102Z_E:
 #===========================================================================
 # Quantum_Composer (1.0 tested)
 #===========================================================================
-class Quantum_Composers:
-    def __init__(self,address,baud_rate = 38400):
-        self.address = address
-        self.baud_rate = baud_rate
-        self.rm = pyvisa.ResourceManager()
-        self.dev = self.rm.open_resource(address, # same as 'ASRL5::INSTR'
-                              baud_rate = self.baud_rate, # must identify
-                              data_bits = 8,
-                              parity = Parity.none,
-                              stop_bits = StopBits.one)
-        self.mux_reset()   # clear all multiplexer
-        self.lev()    # set all outputs to TTL
+def sleep_method(method, *args, **kws):
+    t_sleep = 50e-3
+    def sleeping_method(method, *args, **kws):
+        method(*args, **kws)
+        time.sleep(t_sleep)
         
+    sleeping_method.__name__ = method.__name__
+    sleeping_method.__doc__ = method.__doc__
+    sleeping_method.__module__ = method.__module__
+    return sleeping_method
+
+class Quantum_Composers:
+    @sleep_method
+    def __init__(self,address,*arg):
+        if arg:
+            self.address = address
+            self.baud_rate = arg
+            self.rm = pyvisa.ResourceManager()
+            self.dev = self.rm.open_resource(address, # same as 'ASRL5::INSTR'
+                                  baud_rate = self.baud_rate, # must identify
+                                  data_bits = 8,
+                                  parity = Parity.none,
+                                  stop_bits = StopBits.one)
+            self.mux_reset()   # clear all multiplexer
+            self.lev()    # set all outputs to TTL
+            self.t_sleep = 50e-3
+        else:
+            self.address = address
+            self.rm = pyvisa.ResourceManager()
+            self.dev = self.rm.open_resource(address)
+            self.mux_reset()   # clear all multiplexer
+            self.lev()    # set all outputs to TTL
+            self.dev.clear()
+            self.t_sleep = 50e-3
+
+    @sleep_method
     def t0(self,t):  # clock T0
         self.dev.write(':PULSE0:PER {}'.format(t))
+    @sleep_method
     def norm(self,*ch):   # normal mode, no wait
         if bool(ch) == True:  # specified channel
             for __ch in ch:
@@ -571,18 +578,24 @@ class Quantum_Composers:
             for __ch in range(1,9):  # all channels
                 self.dev.write(':Pulse{}:CMODe NORMal'.format(__ch))
                 self.wcount(__ch,0)
+    @sleep_method            
     def wid(self,ch,w):
         self.dev.write(':PULSE{}:WIDth {}'.format(ch,w))
+    @sleep_method
     def dly(self,ch,d):
         self.dev.write(':PULSE{}:DELay {}'.format(ch,d))
+    @sleep_method
     def pol(self,ch,p):
         self.dev.write(':PULSE{}:POL {}'.format(ch,p))
+    @sleep_method
     def wcount(self,ch,w):  # wait number of T0 before enable output
         self.dev.write(':PULSE{}:WCOunter {}'.format(ch,w))
+    @sleep_method
     def dcycl(self,ch,on,off):   # channel duty cycle
         self.dev.write(':Pulse{}:CMODe DCYCLe'.format(ch))
         self.dev.write(':PULSE{}:PCOunter {}'.format(ch,on))
         self.dev.write(':PULSE{}:OCOunter {}'.format(ch,off))
+    @sleep_method
     def lev(self,*p):    # set the output amplitude of a channel
         if bool(p) == True:  # adjustbale
             __ch = p[0]
@@ -595,7 +608,7 @@ class Quantum_Composers:
         else:   # TTL
             for __ch in range(1,9): 
                 self.lev(__ch)
-
+    @sleep_method
     def mux(self,*p):  ## multiplexer
         if bool(p) == True:
             __ch = p[0]
@@ -606,16 +619,18 @@ class Quantum_Composers:
             self.dev.write(':PULSE{}:MUX {}'.format(__ch,__binary))
         else:
             self.mux_reset()
+    @sleep_method
     def mux_reset(self):   # reset multiplexer
         for n in range(1,9): 
             self.mux(n,n)
-
+    @sleep_method
     def on(self,*ch):
         if bool(ch) == True:
             for channel in ch:
                 self.dev.write(':PULSE{}:STAT ON'.format(channel))
         else:
             self.dev.write(':PULSE0:STAT ON')
+    @sleep_method
     def off(self,*ch):
         if bool(ch) == True:
             for channel in ch:
@@ -628,19 +643,22 @@ class Quantum_Composers:
         self.dev.write(':PULSE0:TRIG:MOD TRIG')  # trig enabled 
         self.on()
         self.dev.write('*TRG')  # software trigger
+        
+    @sleep_method
     def trigOff(self):
         self.off()
         self.dev.write(':PULSE0:TRIG:MOD TRIG')  # trig enabled 
-
+    @sleep_method
     def high(self,*ch):  ## keep output constantly at +5V
         for c in ch:
             self.dev.write(':PULSE{}:POL INV'.format(c))
             self.off(c)
+    @sleep_method
     def low(self,*ch):  ## keep output constantly at 0V
         for c in ch:
             self.dev.write(':PULSE{}:POL NORM'.format(c))
             self.off(c)
-        
+    @sleep_method   
     def __exp(self,T0,ch,pol,tExp,tPls,tDly,nPls,nDly):  # experiment mode
         __dcycl_on = nPls
         __dcycl_tot = round(tExp/T0)
@@ -651,7 +669,7 @@ class Quantum_Composers:
         self.dcycl(ch,__dcycl_on,__dcycl_off)
         self.wcount(ch,nDly)  
         self.on(ch)
-        
+    @sleep_method    
     def config(self,cfg):   # preset configuration
         if re.search('(cal)', cfg, re.IGNORECASE)!= None:   # cavity calibration
             self.mux_reset()
@@ -748,6 +766,17 @@ class Quantum_Composers:
             ## Channel H: TTL for quTAU
             self.__exp(__T0,8,'NORM',__tExp,0.000050,__tResp,1000,30000)
             self.on(1,2,5,6,8)
+    @sleep_method
+    def burst(ch, n_pulses):
+        self.lev(self,ch)
+        self.pol(self,ch,'NORM')
+        self.norm(self,ch)
+        self.on(self,ch)
+        self.trigOff(self)
+        self.dev.write(':PULSe{}:CMOD BURS'.format(ch))
+        time.sleep(self.t_sleep)
+        self.dev.write(':PULSe{}:BCOunter {}'.format(ch,n_pulses))
+        
 
 #================================================================
 # Rigol_DSA832 Spectrum Analyzer ()
@@ -1091,3 +1120,45 @@ class Rigol_DS1104:
         data = (data - 130.0 - voltoffset/voltscale*25) / 25 * voltscale
         
         return data
+
+#===========================================================================
+# Oscilloscope Rigol DMO5000
+#=========================================================================== 
+
+class Rigol_DMO5000:
+    def __init__(self,address):
+        self.address = address
+        self.rm = pyvisa.ResourceManager()
+        self.dev = self.rm.open_resource(self.address)
+        self.run()
+
+    def meas(self,ch,var):  # measure 
+        if type(ch) == str:  # channel info
+            __ch = re.search('\d',ch).group()
+        else:
+            __ch = ch
+        
+        __readOut = self.dev.query(':MEASure:ITEM? {}, CHAN{}'.format(var,__ch))
+        __value = float(re.search('.*(?=\n)',__readOut).group())
+        return __value
+    def run(self):
+        self.dev.write(':RUN')
+    def stop(self):
+        self.dev.write(':STOP')
+    def single(self):
+        self.dev.write(':SINGle')
+        
+    def screenshot(self,ch):
+        self.dev.write(":WAV:SOUR: CHAN{}".format(ch))
+        self.dev.write(":WAV:MODE NORMal")
+        self.dev.write(":WAV:FORM ASC")
+        self.dev.write(":WAV:DATA? CHAN{}".format(ch))
+        rawdata = self.dev.read_raw()
+        rawdata = rawdata.decode('UTF-8')
+        volt_data = rawdata[11:-2] #removes header and ending of data
+        volt_data = np.array([float(data) for data in data.split(',')])
+        
+        t = float(self.dev.query(':WAVeform:XINCrement?'))
+        time_data = np.arange(0,t*len(volt_data),t)
+        
+        return time_data,volt_data

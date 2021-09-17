@@ -1,3 +1,12 @@
+import pyvisa
+from pyvisa.constants import Parity,StopBits
+import numpy as np
+import matplotlib.pyplot as plt
+import re
+import math
+from scipy.signal import find_peaks
+import inspect
+import vxi11
 #===========================================================================
 # Oscilloscope DS1102Z_E,  Pete (v2.6 tested)
 #===========================================================================            

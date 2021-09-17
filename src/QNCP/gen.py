@@ -1,3 +1,12 @@
+import pyvisa
+from pyvisa.constants import Parity,StopBits
+import numpy as np
+import matplotlib.pyplot as plt
+import re
+import math
+from scipy.signal import find_peaks
+import inspect
+import vxi11
 #================================================================
 # Valon_5015('Pete' or 'Ringo')
 #================================================================
@@ -473,8 +482,8 @@ class MOGLabs:
 #===========================================================================
 def sleep_method(method, *args, **kws):
     t_sleep = 50e-3
-    def sleeping_method(method, *args, **kws):
-        method(*args, **kws)
+    def sleeping_method(self, *args, **kws):
+        method(self,*args, **kws)
         time.sleep(t_sleep)
         
     sleeping_method.__name__ = method.__name__
@@ -483,6 +492,7 @@ def sleep_method(method, *args, **kws):
     return sleeping_method
 
 class Quantum_Composers:
+    
     @sleep_method
     def __init__(self,address,*arg):
         if arg:

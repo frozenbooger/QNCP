@@ -7,6 +7,7 @@ import math
 from scipy.signal import find_peaks
 import inspect
 import vxi11
+import time
 #===========================================================================
 # Oscilloscope DS1102Z_E,  Pete (v2.6 tested)
 #===========================================================================            
@@ -215,30 +216,19 @@ class Rigol_DS1104:
         self.dev.write(':SINGle')
     
     def screenshot(self,ch):
-        
-        timescale = float(self.dev.query(":TIM:SCAL?"))        
-        timeoffset = float(self.dev.query(":TIM:OFFS?")[0])# Get the timescale offset
-        voltscale = float(self.dev.query(":CHAN{}:SCAL?".format(ch)))
-        voltoffset = float(str(self.dev.query(":CHAN{}:OFFS?".format(ch))))  # And the voltage offset
-        
         self.dev.write(":WAV:SOUR: CHAN{}".format(ch))
-        self.dev.write(":WAV:POIN:MODE NORM")
+        self.dev.write(":WAV:MODE NORMal")
+        self.dev.write(":WAV:FORM ASC")
         self.dev.write(":WAV:DATA? CHAN{}".format(ch))
-        rawdata = self.dev.read_raw() #1024 data
-        rawdata = rawdata[11:]
-
-        data = np.frombuffer(rawdata, 'B')
+        rawdata = self.dev.read_raw()
+        rawdata = rawdata.decode('UTF-8')
+        volt_data = rawdata[11:-2] #removes header and ending of data
+        volt_data = np.array([float(volt_data) for volt_data in volt_data.split(',')])
         
-        # Walk through the data, and map it to actual voltages
-        data = data + 254
-        data = data[:-1]
-
-        # Now, we know from experimentation that the scope display range is actually
-        # 30-229.  So shift by 130 - the voltage offset in counts, then scale to
-        # get the actual voltage.
-        data = (data - 130.0 - voltoffset/voltscale*25) / 25 * voltscale
+        t = float(self.dev.query(':WAVeform:XINCrement?'))
+        time_data = np.arange(0,t*len(volt_data),t)
         
-        return data
+        return time_data,volt_data
 
 #===========================================================================
 # Oscilloscope Rigol DMO5000
@@ -275,7 +265,7 @@ class Rigol_DMO5000:
         rawdata = self.dev.read_raw()
         rawdata = rawdata.decode('UTF-8')
         volt_data = rawdata[11:-2] #removes header and ending of data
-        volt_data = np.array([float(data) for data in data.split(',')])
+        volt_data = np.array([float(volt_data) for volt_data in volt_data.split(',')])
         
         t = float(self.dev.query(':WAVeform:XINCrement?'))
         time_data = np.arange(0,t*len(volt_data),t)

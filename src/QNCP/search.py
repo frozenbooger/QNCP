@@ -1,3 +1,5 @@
+import pyvisa
+
 def get_resource(inputtype,devicetype,*arg):
     dev_list = []
     for i in range(1,20):
@@ -27,3 +29,7 @@ def identify(inputtype,devicetype,*arg):
                 identity = 'None'
         id_list.append(identity)
     return id_list
+
+def list_resources():
+    rm = pyvisa.ResourceManager()
+    return rm.list_resources()

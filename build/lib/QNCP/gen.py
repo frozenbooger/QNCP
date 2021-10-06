@@ -7,6 +7,7 @@ import math
 from scipy.signal import find_peaks
 import inspect
 import vxi11
+import time
 #================================================================
 # Valon_5015('Pete' or 'Ringo')
 #================================================================
@@ -111,7 +112,7 @@ class Rigol_DSG830:
             return __lev
 
 #================================================================
-# Rigol_DG4202 (1.2 tested)
+# Rigol_DG4202 (1.4)
 #================================================================
 class Rigol_DG4202:
     def __init__(self,address,*arg):
@@ -141,9 +142,6 @@ class Rigol_DG4202:
             self.dev.write(':OUTput1 ON') 
             self.dev.write(':OUTput2 ON')
 
-    def freq(self,ch,f):
-        self.dev.write(':SOURCe{}:Freq {}'.format(ch,self.__Hz(f)));
-
     def __Hz(self,f):  # in Hz, support unit. Default: MHz
         if type(f) == str:
             if re.search('[mM]',f) != None:
@@ -155,19 +153,33 @@ class Rigol_DG4202:
         else: # float, or str that contains only numbers
             return float(f)*1e6
 
-    def lev(self,ch,v):
-        if type(v) == str:
-            __V = float(re.sub('[a-zA-Z]','',v))  # unitless value
-            if re.search('[rR]',v) != None:  #  VRMS
-                self.dev.write(':SOURCe{}:VOLTage:UNIT VRMS'.format(ch))
-            elif re.search('[dD]',v) != None:  # dBm
-                self.dev.write(':SOURCe{}:VOLTage:UNIT DBM'.format(ch))
-        else:  # default: [Vpp] 
-            __V = v
-            self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
+    def freq(self,ch,*f):
+        if bool(f) == True:   # assign value (only the first in the tuple)
+            self.dev.write(':SOURCe{}:Freq {}'.format(ch,self.__Hz(f)));
+        else:   # when no input is entered, read actual frequency 
+            __readOut = self.dev.query(':SOURCe{}:Freq?'.format(ch))
+            __freq = float(re.search('.*(?=\n)',__readOut).group())
+            return float(__freq)*1e-6  # MHz
+    def lev(self,ch,*v):
+        if bool(v) == True:
+            if type(v) == str:
+                __V = float(re.sub('[a-zA-Z]','',v))  # unitless value
+                if re.search('[rR]',v) != None:  #  VRMS
+                    self.dev.write(':SOURCe{}:VOLTage:UNIT VRMS'.format(ch))
+                elif re.search('[dD]',v) != None:  # dBm
+                    self.dev.write(':SOURCe{}:VOLTage:UNIT DBM'.format(ch))
+            else:  # default: [Vpp] 
+                __V = v
+                self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
 
-        self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,__V))
-        self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
+            self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,__V))
+            self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
+        else:
+            __readOut = self.dev.query(':SOURCe{}:VOLTage?'.format(ch))
+            __lev = float(re.search('.*(?=\n)',__readOut).group())
+            __readOut = self.dev.query(':SOURCe{}:VOLTage:UNIT?'.format(ch))
+            __unit = re.search('.*(?=\n)',__readOut).group()
+            return __lev, __unit
 
     def offset(self,ch,o):  # V_DC
         self.dev.write(':SOURCe{}:VOLTage:OFFSet {}'.format(ch,o));
@@ -183,24 +195,27 @@ class Rigol_DG4202:
     def square(self,t,leadingedge,width,amp): #square pulse with duty cycle
         return np.piecewise(t,[(t<=leadingedge),((t>leadingedge) & (t<leadingedge+width)),(t>=leadingedge+width)],[0,amp,0])
     
-    def arb(self,ch,ν,func,*arg):
-        total_time = 1/(self.__Hz(ν))
+    def normalize(self,data):
+        return np.array(data)/max(data)
+        
+    def arb(self,ch,freq,func,*arg):
+        total_time = 1/(self.__Hz(freq))
         
         if inspect.ismethod(func) == True:
             t = np.linspace(0,total_time,1000)
             data = func(t,*arg)
-            datastring = ",".join(map(str,data))
+            datastring = ",".join(map(str,self.normalize(data)))
         else:
             data = func
-            datastring = ",".join(map(str,data))
+            datastring = ",".join(map(str,self.normalize(data)))
         
-        self.dev.write("SOURCE{}:BURST OFF".format(ch))
         self.dev.write("OUTPUT{} ON".format(ch))
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
-        self.dev.write("SOURCE{}:VOLTAGE:UNIT VRMS".format(ch))
-        self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(ν)))
-        self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
-        self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)*2))
+        self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(freq)))
+        self.dev.write("SOURCE{}:VOLTAGE:UNIT VPP".format(ch))
+        self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,max(data)*2))
+#         self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
+#         self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
         self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
         self.dev.write("SOURCE{}:PHASE 0".format(ch))
         self.dev.write("SOURCE{}:PERIOD {}".format(ch,total_time))
@@ -209,23 +224,24 @@ class Rigol_DG4202:
     def ext_trig(self,ch):
         self.dev.write("SOURCE{}:BURST:TRIG:SOUR EXT".format(ch))
     
-    def arb_burst(self,ch,ν,cycles,func,*arg):
-        total_time = 1/(self.__Hz(ν))
+    def arb_burst(self,ch,freq,cycles,func,*arg):
+        total_time = 1/(self.__Hz(freq))
         
         if inspect.ismethod(func) == True:
             t = np.linspace(0,total_time,1000)
             data = func(t,*arg)
-            datastring = ",".join(map(str,data))
+            datastring = ",".join(map(str,self.normalize(data)))
         else:
             data = func
-            datastring = ",".join(map(str,data))
+            datastring = ",".join(map(str,self.normalize(data)))
         
         self.dev.write("OUTPUT{} ON".format(ch))
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
-        self.dev.write("SOURCE{}:VOLTAGE:UNIT VRMS".format(ch))
-        self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(ν)))
-        self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
-        self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)*2))
+        self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(freq)))
+        self.dev.write("SOURCE{}:VOLTAGE:UNIT VPP".format(ch))
+        self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,max(data)*2))
+#         self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
+#         self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
         self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
         self.dev.write("SOURCE{}:PHASE 0".format(ch))
         self.dev.write("SOURCE{}:PERIOD {}".format(ch,total_time))
@@ -235,6 +251,7 @@ class Rigol_DG4202:
         self.dev.write("SOURCE{}:BURST ON".format(ch))
         self.dev.write("SOURCE{}:BURST:NCYC {}".format(ch,cycles))
         self.dev.write("SOURCE{}:BURST:MODE:TRIG".format(ch))
+
         
 #===========================================================================
 #MOGLabs (1.0 tested)
@@ -480,10 +497,10 @@ class MOGLabs:
 #===========================================================================
 # Quantum_Composer (1.0 tested)
 #===========================================================================
-def sleep_method(method, *args, **kws):
+def sleep_method(method, *arg):
     t_sleep = 50e-3
-    def sleeping_method(self, *args, **kws):
-        method(self,*args, **kws)
+    def sleeping_method(self, *arg):
+        method(self,*arg)
         time.sleep(t_sleep)
         
     sleeping_method.__name__ = method.__name__
@@ -497,7 +514,7 @@ class Quantum_Composers:
     def __init__(self,address,*arg):
         if arg:
             self.address = address
-            self.baud_rate = arg
+            self.baud_rate = arg[0]
             self.rm = pyvisa.ResourceManager()
             self.dev = self.rm.open_resource(address, # same as 'ASRL5::INSTR'
                                   baud_rate = self.baud_rate, # must identify
@@ -507,6 +524,7 @@ class Quantum_Composers:
             self.mux_reset()   # clear all multiplexer
             self.lev()    # set all outputs to TTL
             self.t_sleep = 50e-3
+            self.digit   = 11   # important! round evertying to 11 digits
         else:
             self.address = address
             self.rm = pyvisa.ResourceManager()
@@ -515,31 +533,39 @@ class Quantum_Composers:
             self.lev()    # set all outputs to TTL
             self.dev.clear()
             self.t_sleep = 50e-3
+            self.digit   = 11   # important! round evertying to 11 digits
 
+    def rd(self,x,*digit):
+        if bool(digit) == False:
+            return round(x,self.digit)
+        else:
+            return round(x,digit)
     @sleep_method
     def t0(self,t):  # clock T0
+        t = self.rd(t)
         self.dev.write(':PULSE0:PER {}'.format(t))
     @sleep_method
     def norm(self,*ch):   # normal mode, no wait
         if bool(ch) == True:  # specified channel
             for __ch in ch:
                 self.dev.write(':Pulse{}:CMODe NORMal'.format(__ch))
-                self.wcount(__ch,0)
         else:
             for __ch in range(1,9):  # all channels
                 self.dev.write(':Pulse{}:CMODe NORMal'.format(__ch))
-                self.wcount(__ch,0)
     @sleep_method            
     def wid(self,ch,w):
+        w = self.rd(w)
         self.dev.write(':PULSE{}:WIDth {}'.format(ch,w))
     @sleep_method
     def dly(self,ch,d):
+        d = self.rd(d)
         self.dev.write(':PULSE{}:DELay {}'.format(ch,d))
     @sleep_method
     def pol(self,ch,p):
         self.dev.write(':PULSE{}:POL {}'.format(ch,p))
     @sleep_method
     def wcount(self,ch,w):  # wait number of T0 before enable output
+        w = self.rd(w)        
         self.dev.write(':PULSE{}:WCOunter {}'.format(ch,w))
     @sleep_method
     def dcycl(self,ch,on,off):   # channel duty cycle
@@ -552,6 +578,7 @@ class Quantum_Composers:
             __ch = p[0]
             if len(p) > 1:
                 __volt = p[1]
+                __volt = self.rd(__volt)
                 self.dev.write(':PULSE{}:OUTPut:MODe ADJustable'.format(__ch))
                 self.dev.write(':PULSE{}:OUTPut:AMPLitude {}'.format(__ch,__volt))
             else:
@@ -611,6 +638,10 @@ class Quantum_Composers:
             self.off(c)
     @sleep_method   
     def __exp(self,T0,ch,pol,tExp,tPls,tDly,nPls,nDly):  # experiment mode
+        T0 = self.rd(T0)
+        tExp = self.rd(tExp)
+        tPls = self.rd(tPls)
+        tDly = self.rd(tDly)
         __dcycl_on = nPls
         __dcycl_tot = round(tExp/T0)
         __dcycl_off = __dcycl_tot - __dcycl_on
@@ -718,12 +749,11 @@ class Quantum_Composers:
             self.__exp(__T0,8,'NORM',__tExp,0.000050,__tResp,1000,30000)
             self.on(1,2,5,6,8)
     @sleep_method
-    def burst(ch, n_pulses):
-        self.lev(self,ch)
-        self.pol(self,ch,'NORM')
-        self.norm(self,ch)
-        self.on(self,ch)
-        self.trigOff(self)
+    def burst(self, ch, n_pulses):
+        self.lev(ch)
+        self.pol(ch,'NORM')
+        self.on(ch)
+        self.trigOff()
         self.dev.write(':PULSe{}:CMOD BURS'.format(ch))
         time.sleep(self.t_sleep)
         self.dev.write(':PULSe{}:BCOunter {}'.format(ch,n_pulses))
@@ -774,15 +804,11 @@ class Agilent_ESG_SG:
 # Tektronix AFG3000 Series Arbitrary Function Generator
 #================================================================
 
-class Tektronix_AFG3000:
+class tektronix_AFG3000:
     def __init__(self,address,*arg):
-        if arg:
-            self.address = address #'TCPIP::<IP ADDRESS>::INSTR'
-            self.dev = vxi11.Instrument(self.address)
-        else:
-            self.address = address 
-            self.rm = pyvisa.ResourceManager()
-            self.dev = self.rm.open_resource(self.address)
+        self.address = address 
+        self.rm = pyvisa.ResourceManager()
+        self.dev = self.rm.open_resource(self.address)
         
     def reset(self): #Reset
         self.dev.write("*RST")
@@ -793,8 +819,8 @@ class Tektronix_AFG3000:
     def on(self): # default: both 
         self.dev.write(':OUTPut ON')
 
-    def freq(self,ch,f):
-        self.dev.write(':SOURCe{}:Freq:FIXed {}'.format(ch,self.__Hz(f)));
+    def freq(self,f):
+        self.dev.write('SOURce:FREQuency:FIXed {}'.format(self.__Hz(f)));
 
     def __Hz(self,f):  # in Hz, support unit. Default: MHz
         if type(f) == str:
@@ -807,25 +833,28 @@ class Tektronix_AFG3000:
         else: # float, or str that contains only numbers
             return float(f)*1e6
 
-    def lev(self,ch,v):
+    def lev(self,v):
         if type(v) == str:
             __V = float(re.sub('[a-zA-Z]','',v))  # unitless value
             if re.search('[rR]',v) != None:  #  VRMS
-                self.dev.write(':SOURCe{}:VOLTage:UNIT VRMS'.format(ch))
+                self.dev.write('SOURCe:VOLTage:UNIT VRMS')
             elif re.search('[dD]',v) != None:  # dBm
-                self.dev.write(':SOURCe{}:VOLTage:UNIT DBM'.format(ch))
+                self.dev.write('SOURCe:VOLTage:UNIT DBM')
         else:  # default: [Vpp] 
             __V = v
-            self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
+            self.dev.write(':SOURCe:VOLTage:UNIT VPP')
 
-        self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,__V))
-        self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
+        self.dev.write('SOURCe:VOLTage {}'.format(__V))
+        self.dev.write('SOURCe:VOLTage:UNIT VPP')
 
-    def offset(self,ch,o):  # V_DC
-        self.dev.write(':SOURCe{}:VOLTage:OFFSet {}'.format(ch,o));
+    def offset(self,o):  # V_DC
+        self.dev.write('SOURC:VOLTage:OFFSet {}'.format(o));
 
-    def phase(self,ch,p):
-        self.dev.write(':SOURCe{}:PHASe {}'.format(ch,p));
+    def phase(self,p):
+        self.dev.write('SOURC:PHASe {}'.format(p));
+        
+    def burst_delay(self,t):
+        self.dev.write('SOUR:BURS:TDEL {}ns'.format(t))
         
     def gaussian(self,t,mu,FWHM,a): #Gaussian Function. Inputs: (FWHM, Amplitude, Center)
         sigma = (FWHM)/(2*np.sqrt(2*np.log(2)))
@@ -835,55 +864,92 @@ class Tektronix_AFG3000:
     def square(self,t,leadingedge,width,amp): #square pulse with duty cycle
         return np.piecewise(t,[(t<=leadingedge),((t>leadingedge) & (t<leadingedge+width)),(t>=leadingedge+width)],[0,amp,0])
     
-    def arb(self,ch,ν,func,*arg):
-        total_time = 1/(self.__Hz(ν))
+    def arb(self,freq,func,*arg):
+        total_time = 1/(self.__Hz(freq))
         
         if inspect.ismethod(func) == True:
-            t = np.linspace(0,total_time,1000)
+            
+            t = np.linspace(0,total_time,2**13)
             data = func(t,*arg)
-            datastring = ",".join(map(str,data))
+            
+            datastring = self.normalize(data)
+            m = 16382 / (datastring.max() - datastring.min())
+            b = -m * datastring.min()
+            dac_values = (m * datastring + b)
+            np.around(dac_values, out=dac_values)
+            dac_values = dac_values.astype(np.uint16)
+            
         else:
             data = func
-            datastring = ",".join(map(str,data))
+            datastring = self.normalize(data)
+            m = 16382 / (datastring.max() - datastring.min())
+            b = -m * datastring.min()
+            dac_values = (m * datastring + b)
+            np.around(dac_values, out=dac_values)
+            dac_values = dac_values.astype(np.uint16)
         
-        self.dev.write("SOURCE{}:BURST OFF".format(ch))
-        self.dev.write("OUTPUT{} ON".format(ch))
-        self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
-        self.dev.write("SOURCE{}:VOLTAGE:UNIT VRMS".format(ch))
-        self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(ν)))
-        self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
-        self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)*2))
-        self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
-        self.dev.write("SOURCE{}:PHASE 0".format(ch))
-        self.dev.write("SOURCE{}:PERIOD {}".format(ch,total_time))
-        self.dev.write("SOURCE{}:PHASE:INIT".format(ch))
+        self.dev.write("SOURCE:BURST OFF")
+        self.dev.write("OUTPUT ON")
+        self.dev.write("DATA:DEF EMEM,", str(len(data)))
+        self.dev.write_binary_values("DATA:DATA EMEM1,", dac_values, datatype="H", is_big_endian=True)
+        self.dev.write("SOURce:FUNC:SHAPE EMEM1")
+        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:LOW {}".format(min(data)))
+        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:HIGH {}".format(max(data)))
+        self.dev.write("SOURCE:PHASE 0")
+        self.dev.write("SOURCE:PERIOD {}".format(total_time))
     
     def ext_trig(self):
         self.dev.write("TRIGger:SEQuence:SOURce EXTernal")
+        
+    def normalize(self,data):
+        return np.array(data)/np.absolute(max(data))
     
-    def arb_burst(self,ch,ν,cycles,func,*arg):
-        total_time = 1/(self.__Hz(ν))
+    def arb_burst(self,freq,cycles,func,*arg):
+        total_time = 1/(self.__Hz(freq))
         
         if inspect.ismethod(func) == True:
-            t = np.linspace(0,total_time,1000)
+            
+            t = np.linspace(0,total_time,2**13)
             data = func(t,*arg)
-            datastring = ",".join(map(str,data))
+            
+            datastring = self.normalize(data)
+            m = 16382 / (datastring.max() - datastring.min())
+            b = -m * datastring.min()
+            dac_values = (m * datastring + b)
+            np.around(dac_values, out=dac_values)
+            dac_values = dac_values.astype(np.uint16)
+            
         else:
             data = func
-            datastring = ",".join(map(str,data))
+            datastring = self.normalize(data)
+            m = 16382 / (datastring.max() - datastring.min())
+            b = -m * datastring.min()
+            dac_values = (m * datastring + b)
+            np.around(dac_values, out=dac_values)
+            dac_values = dac_values.astype(np.uint16)
         
-        self.dev.write("OUTPUT{} ON".format(ch))
-        self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
-        self.dev.write("SOURCE{}:VOLTAGE:UNIT VRMS".format(ch))
-        self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(ν)))
-        self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
-        self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)*2))
-        self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
-        self.dev.write("SOURCE{}:PHASE 0".format(ch))
-        self.dev.write("SOURCE{}:PERIOD {}".format(ch,total_time))
-        self.dev.write("SOURCE{}:PHASE:SYNC".format(ch))
-        
+        self.dev.write("OUTPUT ON")
+        self.dev.write("DATA:DEF EMEM,", str(len(data)))
+        self.dev.write_binary_values("DATA:DATA EMEM1,", dac_values, datatype="H", is_big_endian=True)
+        self.dev.write("SOURce:FUNC:SHAPE EMEM1")
+        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:LOW {}".format(min(data)))
+        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:HIGH {}".format(max(data)))
+        self.dev.write("SOURCE:PHASE 0")
+        self.dev.write("SOURCE:PERIOD {}".format(total_time))
+    
         #triggered burst
-        self.dev.write("SOURCE{}:BURST ON".format(ch))
-        self.dev.write("SOURCE{}:BURST:NCYC {}".format(ch,cycles))
-        self.dev.write("SOURCE{}:BURST:MODE:TRIG".format(ch))
+        self.dev.write("SOURCE:BURST:STAT ON")
+        self.dev.write("SOURCE:BURST:NCYC {}".format(cycles))
+        self.dev.write("SOURCE:BURST:MODE TRIG")
+        
+    def burst(self,number,amp):
+        self.dev.write("SOUR:BURS:MODE TRIG")
+        self.dev.write("SOUR:BURS:NCYC {}".format(number))
+        self.dev.write("SOUR:BURS:MODE TRIG")
+        self.dev.write("SOUR:BURS:STAT ON")
+        self.dev.write("SOUR:BURS:DEL {}".format(0))
+        self.dev.write("SOUR:FUNC:SHAP SQU")
+        self.dev.write("SOUR:VOLT:LEV:IMM:AMPL {}V".format(amp))
+        self.dev.write("TRIG:SEQ:SOUR EXT")
+        self.dev.write("SOURCE:VOLTAGE:LEV:IMM:OFFSET 1V")
+        self.dev.write("OUTP:STAT ON")

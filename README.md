@@ -10,6 +10,10 @@ To install simply type in
 
     pip install QNCP
     
+To update to newest version
+    
+    pip install --upgrade qncp
+    
 ## Instruments 
 
 The different instruments supported by this library are divided into the following categories:

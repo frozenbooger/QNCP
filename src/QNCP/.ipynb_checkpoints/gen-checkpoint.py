@@ -621,6 +621,10 @@ class Quantum_Composers:
         self.dev.write(':PULSE0:TRIG:MOD TRIG')  # trig enabled 
         self.on()
         self.dev.write('*TRG')  # software trigger
+
+    @sleep_method        
+    def cw(self): # continuous running mode
+        self.dev.write(':PULSE0:TRIG:MOD DIS')  # trig disabled 
         
     @sleep_method
     def trigOff(self):

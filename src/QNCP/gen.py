@@ -448,10 +448,7 @@ class MOGDevice:
             if val is not None: self.dev.settimeout(val)
             return old
 
-#===========================================================================
-# MOGLabs
-#===========================================================================         
-
+# Driver
 class MOGLabs:
     def __init__(self,address): #<IP ADDRESS>
         self.address = address
@@ -495,7 +492,7 @@ class MOGLabs:
         self.dev.cmd('POW,{},30 dBm'.format(ch) )
         
 #===========================================================================
-# Quantum_Composer (1.0 tested)
+# Quantum_Composer 
 #===========================================================================
 def sleep_method(method, *arg):
     t_sleep = 50e-3
@@ -548,10 +545,14 @@ class Quantum_Composers:
     def norm(self,*ch):   # normal mode, no wait
         if bool(ch) == True:  # specified channel
             for __ch in ch:
-                self.dev.write(':Pulse{}:CMODe NORMal'.format(__ch))
+                if __ch > 0: # channel model
+                    self.dev.write(':Pulse{}:CMODe NORMal'.format(__ch))
+                elif __ch == 0:  # T0 mode
+                    self.dev.write(':Pulse0:MODe NORMal')
         else:
-            for __ch in range(1,9):  # all channels
+            for __ch in range(1,9):  # all channels and T0
                 self.dev.write(':Pulse{}:CMODe NORMal'.format(__ch))
+                self.dev.write(':Pulse0:MODe NORMal')
     @sleep_method            
     def wid(self,ch,w):
         w = self.rd(w)
@@ -564,8 +565,7 @@ class Quantum_Composers:
     def pol(self,ch,p):
         self.dev.write(':PULSE{}:POL {}'.format(ch,p))
     @sleep_method
-    def wcount(self,ch,w):  # wait number of T0 before enable output
-        w = self.rd(w)        
+    def wcount(self,ch,w):  # wait number of T0 before enable output       
         self.dev.write(':PULSE{}:WCOunter {}'.format(ch,w))
     @sleep_method
     def dcycl(self,ch,on,off):   # channel duty cycle

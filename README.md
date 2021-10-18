@@ -12,7 +12,7 @@ To install simply type in
     
 To update to newest version
     
-    pip install --upgrade qncp
+    pip install --upgrade QNCP
     
 ## Instruments 
 

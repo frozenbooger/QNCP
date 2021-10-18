@@ -65,10 +65,10 @@ class Valon_5015:
 #         self.dev.close()
 
 #================================================================
-# Rigol_DSG830 (tested)
+# Function Generator - Rigol DSG800
 #================================================================
 
-class Rigol_DSG830:
+class Rigol_DSG800:
     def __init__(self,address,*arg):
         if arg:
             self.address = address #'TCPIP::<IP ADDRESS>::INSTR'

@@ -65,7 +65,7 @@ class Valon_5015:
 #         self.dev.close()
 
 #================================================================
-# Function Generator - Rigol DSG800
+# Function Generator - Rigol DSG800 series
 #================================================================
 
 class Rigol_DSG800:
@@ -112,9 +112,9 @@ class Rigol_DSG800:
             return __lev
 
 #================================================================
-# Rigol_DG4202 (1.4)
+# Function Generator - Rigol DG4000 series
 #================================================================
-class Rigol_DG4202:
+class Rigol_DG4000:
     def __init__(self,address,*arg):
         if arg:
             self.address = address #'TCPIP::<IP ADDRESS>::INSTR'

@@ -9,9 +9,9 @@ import inspect
 import vxi11
 import time
 #===========================================================================
-# Oscilloscope DS1102Z_E,  Pete (v2.6 tested)
+# Oscilloscope Rigol DS1000E series
 #===========================================================================            
-class Rigol_DS1102Z_E:
+class Rigol_DS1000E:
     def __init__(self,address): # 'TCPIP::<IP ADDRESS>::INSTR'
         self.address = address
         self.rm = pyvisa.ResourceManager()

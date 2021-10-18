@@ -9,9 +9,9 @@ import inspect
 import vxi11
 import time
 #===========================================================================
-# Oscilloscope DS1102Z_E,  Pete (v2.6 tested)
+# Oscilloscope - Rigol DS1000E series 
 #===========================================================================            
-class Rigol_DS1102Z_E:
+class Rigol_DS1000E:
     def __init__(self,address): # 'TCPIP::<IP ADDRESS>::INSTR'
         self.address = address
         self.rm = pyvisa.ResourceManager()
@@ -59,9 +59,9 @@ class Rigol_DS1102Z_E:
             self.dev.write(':TRIG:EDGe:LEV {}'.format(__vTrig))  
             
 #================================================================
-# Rigol_DSA832 Spectrum Analyzer ()
+# Spectrum Analyzer - Rigol_DSA800 series 
 #================================================================
-class Rigol_DSA832:
+class Rigol_DSA800:
     def __init__(self,address): #'TCPIP::<IP ADDRESS>::INSTR' 
         self.address = address            
         self.rm = pyvisa.ResourceManager()
@@ -231,7 +231,7 @@ class Rigol_DS1104:
         return time_data,volt_data
 
 #===========================================================================
-# Oscilloscope Rigol DMO5000
+# Oscilloscope - Rigol DMO5000
 #=========================================================================== 
 
 class Rigol_DMO5000:

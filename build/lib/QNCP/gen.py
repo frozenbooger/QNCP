@@ -65,10 +65,10 @@ class Valon_5015:
 #         self.dev.close()
 
 #================================================================
-# Rigol_DSG830 (tested)
+# Function Generator - Rigol DSG800 series
 #================================================================
 
-class Rigol_DSG830:
+class Rigol_DSG800:
     def __init__(self,address,*arg):
         if arg:
             self.address = address #'TCPIP::<IP ADDRESS>::INSTR'
@@ -112,9 +112,9 @@ class Rigol_DSG830:
             return __lev
 
 #================================================================
-# Rigol_DG4202 (1.4)
+# Function Generator - Rigol DG4000 series
 #================================================================
-class Rigol_DG4202:
+class Rigol_DG4000:
     def __init__(self,address,*arg):
         if arg:
             self.address = address #'TCPIP::<IP ADDRESS>::INSTR'
@@ -254,7 +254,7 @@ class Rigol_DG4202:
 
         
 #===========================================================================
-#MOGLabs (1.0 tested)
+#MOGLabs
 #===========================================================================
 class MOGDevice:
     def __init__(self,addr,port=None,timeout=1,check=True):
@@ -492,7 +492,7 @@ class MOGLabs:
         self.dev.cmd('POW,{},30 dBm'.format(ch) )
         
 #===========================================================================
-# Quantum_Composer 
+# Quantum Composers
 #===========================================================================
 def sleep_method(method, *arg):
     t_sleep = 50e-3
@@ -668,90 +668,6 @@ class Quantum_Composers:
         elif re.search('(off)', cfg, re.IGNORECASE)!= None:  # all off
             self.mux_reset()
             self.off(0,1,2,3,4,5,6,7,8)
-        elif re.search('c.*(eit)', cfg,re.IGNORECASE) != None:
-            self.mux_reset()
-            self.off(1,2,3,4,5,6,7,8,0)
-            self.trigOff() ## setup system
-            __T0 = 100e-6
-            __tExp = 3.3
-            __tResp = 0e-6  # time that cooling may remain ~0.2 us
-            self.dev.write(':PULSE0:PER {}'.format(__T0))  # 0.000100080   
-            ## Channel A: Cooling & Magnetic Field 
-            self.__exp(__T0,1,'NORM',__tExp,0.3,0.0,1,30000) 
-            ## Channel B: Repumper
-            self.__exp(__T0,2,'INV',__tExp,0.3,0.0,1,30000)
-            ## Channel C: Probe
-            self.__exp(__T0,3,'NORM',__tExp,0.1,__tResp,1,30000)
-            ## Channel D: Control
-            self.__exp(__T0,4,'NORM',__tExp,0.000050,__tResp,1000,30000)
-            ## Channel H: TTL for quTAU
-            self.__exp(__T0,8,'NORM',__tExp,0.000050,__tResp,1000,30000)
-            self.on(1,2,3,4,8)   # this won't start the trigger mode
-        ## DLCZ_1, d2 photon generation
-        elif (re.search('(photon)|(d2)', cfg ,re.IGNORECASE) != None) and (re.search('(no wait)', cfg ,re.IGNORECASE) == None):  
-            self.mux_reset()
-            self.off(1,2,3,4,5,6,7,8,0)
-            self.trigOff() ## setup system
-#            __T0 = 100e-6
-            __T0 = 10e-6
-            __tExp = 3.3
-            self.dev.write(':PULSE0:PER {}'.format(__T0))  # 0.000100080   
-            ## Channel A: Cooling & Magnetic Field 
-            self.__exp(__T0,1,'INV',__tExp,3.0,0.0,1,0) 
-            ## Channel B: Repumper
-            self.__exp(__T0,2,'NORM',__tExp,3.0,0.0,1,0)
-            ## Channel D: Pump
-            self.__exp(__T0,4,'NORM',__tExp,0.000005,0.0,10000,300001)
-#             self.__exp(__T0,4,'NORM',__tExp,0.0000025,0.0,10000,300001)
-            ## Channel H: TTL for quTAU
-            self.__exp(__T0,8,'NORM',__tExp,0.000005,0.0,10000,300000) 
-#             self.__exp(__T0,8,'NORM',__tExp,0.0000025,0.0,10000,300000)
-            self.on(1,2,4,8)
-        elif re.search('(d2 photon no wait)',cfg,re.IGNORECASE) != None:  
-            self.mux_reset()
-            self.off(1,2,3,4,5,6,7,8,0)
-            self.trigOff() ## setup system
-            __T0 = 100e-6
-            __tExp = 3.3
-            __tResp = 0e-6  # no waiting 
-            self.dev.write(':PULSE0:PER {}'.format(__T0))  # 0.000100080   
-            ## Channel A: Cooling & Magnetic Field 
-            self.__exp(__T0,1,'INV',__tExp,3.0,0.0,1,0) 
-            ## Channel B: Repumper
-            self.__exp(__T0,2,'NORM',__tExp,3.0,0.0,1,0)
-            ## Channel D: Pump
-            self.__exp(__T0,4,'NORM',__tExp,0.000050,__tResp,1000,30000)
-            ## Channel H: TTL for quTAU
-            self.__exp(__T0,8,'NORM',__tExp,0.000050,__tResp,1000,30000)
-            self.on(1,2,4,8)
-        elif re.search('(fluo)',cfg,re.IGNORECASE) != None:    # fluorescence
-            self.mux_reset()
-            self.off(1,2,3,4,5,6,7,8,0)
-            self.trigOff() ## setup system
-            __T0 = 100e-6
-            __tExp = 3.3
-            __tResp = 0e-6  # no waiting 
-            self.dev.write(':PULSE0:PER {}'.format(__T0))  # 0.000100080   
-            ## Channel A: Magnetic Field 
-            self.__exp(__T0,1,'INV',__tExp,3.0,0.0,1,0) 
-            ## Channel B: Repumper
-            if re.search('(repump)',cfg,re.IGNORECASE) != None:   # leave repump on
-                __repumpTime = 3.0 + 0.1
-            else:
-                __repumpTime = 3.0
-            self.__exp(__T0,2,'NORM',__tExp,__repumpTime,0.0,1,0)
-            ## Channel E: Cooling
-            if re.search('(cool)',cfg,re.IGNORECASE) != None:   # leave cooling on
-                __coolTime = 3.0 + 0.1
-            else:
-                __coolTime = 3.0
-            self.__exp(__T0,5,'INV',__tExp,__coolTime,0.0,1,0) 
-            ## added for cooling
-            self.__exp(__T0,6,'INV',__tExp,0.1,0.0,1,30001) 
-            self.mux(5,5,6)
-            ## Channel H: TTL for quTAU
-            self.__exp(__T0,8,'NORM',__tExp,0.000050,__tResp,1000,30000)
-            self.on(1,2,5,6,8)
     @sleep_method
     def burst(self, ch, n_pulses):
         self.lev(ch)

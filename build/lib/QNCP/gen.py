@@ -166,12 +166,16 @@ class Rigol_DG4000:
             __v = v[0]
             if type(__v) == str:
                 __lev = float(re.sub('[a-zA-Z]','',__v))  # unitless value
-                if re.search('r',__v,re.IGNORECASE) != None:  #  VRMS
+                if re.search('(vrms)',__v,re.IGNORECASE) != None:  #  VRMS
                     self.dev.write(':SOURCe{}:VOLTage:UNIT VRMS'.format(ch))
                 elif re.search('d',__v,re.IGNORECASE) != None:  # dBm
                     self.dev.write(':SOURCe{}:VOLTage:UNIT DBM'.format(ch))
-                else:  # dBm
+                else:  # VPP
                     self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
+                # mVPP or mVRMS
+                if re.search('(mv)',__v,re.IGNORECASE) != None:
+                    __lev = 1e-3 * __lev
+                # value
                 self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,__lev))
             else:  # default: [Vpp] 
                 self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))

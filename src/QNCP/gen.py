@@ -155,25 +155,27 @@ class Rigol_DG4000:
 
     def freq(self,ch,*f):
         if bool(f) == True:   # assign value (only the first in the tuple)
-            self.dev.write(':SOURCe{}:Freq {}'.format(ch,self.__Hz(f)));
+            __freq = f[0]
+            self.dev.write(':SOURCe{}:Freq {}'.format(ch,self.__Hz(__freq)));
         else:   # when no input is entered, read actual frequency 
             __readOut = self.dev.query(':SOURCe{}:Freq?'.format(ch))
             __freq = float(re.search('.*(?=\n)',__readOut).group())
             return float(__freq)*1e-6  # MHz
     def lev(self,ch,*v):
         if bool(v) == True:
-            if type(v) == str:
-                __V = float(re.sub('[a-zA-Z]','',v))  # unitless value
-                if re.search('[rR]',v) != None:  #  VRMS
+            __v = v[0]
+            if type(__v) == str:
+                __lev = float(re.sub('[a-zA-Z]','',__v))  # unitless value
+                if re.search('r',__v,re.IGNORECASE) != None:  #  VRMS
                     self.dev.write(':SOURCe{}:VOLTage:UNIT VRMS'.format(ch))
-                elif re.search('[dD]',v) != None:  # dBm
+                elif re.search('d',__v,re.IGNORECASE) != None:  # dBm
                     self.dev.write(':SOURCe{}:VOLTage:UNIT DBM'.format(ch))
+                else:  # dBm
+                    self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
+                self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,__lev))
             else:  # default: [Vpp] 
-                __V = v
                 self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
-
-            self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,__V))
-            self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
+                self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,__v))
         else:
             __readOut = self.dev.query(':SOURCe{}:VOLTage?'.format(ch))
             __lev = float(re.search('.*(?=\n)',__readOut).group())

@@ -862,6 +862,7 @@ class tektronix_AFG3000:
         self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:HIGH {}".format(max(data)))
         self.dev.write("SOURCE:PHASE 0")
         self.dev.write("SOURCE:PERIOD {}".format(total_time))
+        self.dev.write("SOURCE:FREQ {}".format(self.__Hz(freq)))
     
         #triggered burst
         self.dev.write("SOURCE:BURST:STAT ON")

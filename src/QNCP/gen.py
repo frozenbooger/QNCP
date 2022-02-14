@@ -219,7 +219,7 @@ class Rigol_DG4000:
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
         self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(freq)))
         self.dev.write("SOURCE{}:VOLTAGE:UNIT VPP".format(ch))
-        self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,max(data)*2))
+        self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,max(data)))
 #         self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
 #         self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
         self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
@@ -245,7 +245,7 @@ class Rigol_DG4000:
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
         self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(freq)))
         self.dev.write("SOURCE{}:VOLTAGE:UNIT VPP".format(ch))
-        self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,max(data)*2))
+        self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,max(data)))
 #         self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
 #         self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
         self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
@@ -880,3 +880,154 @@ class tektronix_AFG3000:
         self.dev.write("TRIG:SEQ:SOUR EXT")
         self.dev.write("SOURCE:VOLTAGE:LEV:IMM:OFFSET 1V")
         self.dev.write("OUTP:STAT ON")
+        
+
+#================================================================
+# Rigol DP8000 Series DC Power Supply
+#================================================================        
+
+class Rigol_DP800:
+
+    def __init__(self,address): 
+        """ 
+        Description: This function will initialize the power supply class object 
+    
+        Input: IP address : string
+        Output: power supply object with built in funtions : class object
+
+        Example: 
+        >>gen1 = gen.Rigol_DP800('TCPIP::10.2.1.158')
+
+        """
+        self.address = address            
+        self.rm = pyvisa.ResourceManager()
+        self.dev = self.rm.open_resource(self.address)
+        
+    def inspect(self): 
+        """ 
+        Description: This function will return to you the current settings of the 
+        power supply. This includes overvoltage/overcurrent protection, overvoltage/current protection value 
+        state on each channel, range of each channel
+    
+    
+        Input: None : None
+        Output: Characterization List : String
+
+        Example: 
+        >>gen1.inspect()
+        
+        (CH1 :: Mode : CV :: OCP state : ON :: OCP value : 0.5mA ::  OVP state : OFF :: OVP value : 0.5V :: Range : 10A/5V :: State : ON)
+        etc...
+
+        """
+        try: 
+            for i in range(1,4):
+                ch = 'CH{} :: '.format(i)
+                ch = ch,'Mode : ',str(self.dev.query(':OUTP:MODE? CH{};*OPC?'.format(i))),' :: '
+                ch = ch,'OCP state : ',str(self.dev.query(':OUTP:OCP? CH{};*OPC?'.format(i))),' :: '
+                ch = ch,'OCP value : ',str(self.dev.query(':OUTP:OCP:VAL? CH{};*OPC?'.format(i))),' :: '
+                ch = ch,'OVP state : ',str(self.dev.query(':OUTP:OVP? CH{};*OPC?'.format(i))),' :: '
+                ch = ch,'OVP value : ',str(self.dev.query(':OUTP:OVP:VAL? CH{};*OPC?'.format(i))),' :: '
+                print(ch)
+        except:
+            print('unable to obtain parameters')
+        return
+        
+    def set_safety(self): 
+        """ 
+        Description: This function will return to you the current settings of the 
+        power supply. This includes overvoltage/overcurrent protection, overvoltage/current protection value 
+        state on each channel, range of each channel
+    
+    
+        Input: None : None
+        Output: Characterization List : String
+
+        Example: 
+        >>gen1.set_safety()
+
+        """
+        try: 
+            for i in range(1,4):
+                self.dev.write(':OUTP:OCP CH{},ON'.format(i))
+                self.dev.write(':OUTP:OVP CH{},ON'.format(i))
+            print('SAFETY SET')
+        except:
+            print('unable to excecute')
+        return
+    
+    def on(self, *ch): 
+        """ 
+        Description: Will turn on specified channel
+    
+    
+        Input: ch : [1,2,3]
+        Output: Method which turns the output state to on
+
+        Example: 
+        >>gen1.on(1)
+
+        """
+        if bool(ch) == True:
+            self.dev.write(':OUTP CH{}, ON'.format(ch[0]))
+        else:
+            for i in range(1,4):
+                self.dev.write(':OUTP CH{}, ON'.format(i))
+        return
+    
+    def off(self, *ch): 
+        """ 
+        Description: Will turn off specified channel
+    
+    
+        Input: ch : [1,2,3]
+        Output: Method which turns the output state to off
+
+        Example: 
+        >>gen1.off(2)
+
+        """
+        if bool(ch) == True:
+            self.dev.write(':OUTP CH{}, OFF'.format(ch[0]))
+        else:
+            for i in range(1,4):
+                self.dev.write(':OUTP CH{}, OFF'.format(i))
+        return
+    
+    def current(self, ch, *current): 
+        """ 
+        Description: This function will set or get the current of the specified channel
+    
+    
+        Input: channel : [1,2,3], current : float
+        Output: Method which changes the current
+
+        Example: 
+        >>gen1.current(1,2)
+
+        """
+        if current:
+            self.dev.write('SOUR{}:CURR {}'.format(ch,current[0])) #Units Amps
+        else:
+            self.dev.write('SOUR{}:CURR?'.format(ch))
+ 
+        return
+
+    def voltage(self, ch, *voltage): 
+        """ 
+        Description: This function will set or get the voltage of the specified channel
+    
+    
+        Input: channel : [1,2,3], voltage : float
+        Output: Method which changes the voltage
+
+        Example: 
+        >>gen1.voltage(1,2)
+
+        """
+        if bool(voltage) == True:
+            self.dev.write('SOUR{}:VOLT {}'.format(ch,voltage[0])) #Units Volts
+        else:
+            print(self.dev.query('SOUR{}:VOLT?'.format(ch)))
+ 
+        return

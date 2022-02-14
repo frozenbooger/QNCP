@@ -271,3 +271,57 @@ class Rigol_DMO5000:
         time_data = np.arange(0,t*len(volt_data),t)
         
         return time_data,volt_data
+    
+#===========================================================================
+# Polarimeter - Thorlabs PAX1000
+#=========================================================================== 
+    
+class thorlabs_polarimeter:
+    def __init__(self,address):
+        """ 
+        Description: The initialization of the polarimeter class 
+        will initialize a singular device using its VISA USB address
+
+        Input: VISA address : string
+        Output: device object with all its methods : class object
+        Example: 
+        >>thorlabs_polarimeter('USB::0x1234::125::A22-5::INSTR')
+
+        thorlabs_polarimeter.class.object...
+        """
+        self.address = address
+        self.rm = pyvisa.ResourceManager()
+        self.dev = self.rm.open_resource(self.address)
+
+    def get_polarzation_params(self):
+        """ 
+        Description: Returns the current measured Stokes parameters
+        for the polarimeter
+
+        Input: None : None
+        Output: Stokes Parameters : tuple
+        Example: 
+        >>get_polarzation_params()
+
+        20, 28, 19, 1, 1
+        """
+        data = self.dev.query('SENS:DATA:LAT?')
+        data = data.split(',')
+        psi = float(data[9])
+        chi = float(data[10])
+        dop= float(data[11])
+        power = float(data[12])
+        s1 = np.cos(2 * psi) * np.cos(2 * chi)
+        s2 = np.sin(2 * psi) * np.cos(2 * chi)
+        s3 = np.sin(2 * chi)
+        return s1, s2, s3, dop, power
+
+    def get_raw_data(self):
+        """ 
+        Description: Returns the raw data read from the polarimeter 
+
+        Input: None : None
+        Output: Raw Data from Polarimeter : string
+        """
+        data = self.dev.query('SENS:DATA:LAT?')
+        return data

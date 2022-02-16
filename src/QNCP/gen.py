@@ -676,12 +676,7 @@ class Quantum_Composers:
             self.off(0,1,2,3,4,5,6,7,8)
     @sleep_method
     def burst(self, ch, n_pulses):
-        self.lev(ch)
-        self.pol(ch,'NORM')
-        self.on(ch)
-        self.trigOff()
         self.dev.write(':PULSe{}:CMOD BURS'.format(ch))
-        time.sleep(self.t_sleep)
         self.dev.write(':PULSe{}:BCOunter {}'.format(ch,n_pulses))
 
 #================================================================

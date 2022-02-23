@@ -276,6 +276,22 @@ class Rigol_DMO5000:
 # Polarimeter - Thorlabs PAX1000
 #=========================================================================== 
     
+def list_resources():
+    """ 
+    Description: This function will return all usb connected 
+    devices to a computer in the VISA format. 
+    
+    Input: None : None
+    Output: list of device addresses : List 
+    
+    Example: 
+    >>list_resources()
+    
+    ['ASRL5::INSTR', 'USB::0x1234::125::A22-5::INSTR']
+    """
+    rm = pyvisa.ResourceManager()
+    return rm.list_resources()
+
 class thorlabs_polarimeter:
     def __init__(self,address):
         """ 
@@ -292,7 +308,60 @@ class thorlabs_polarimeter:
         self.address = address
         self.rm = pyvisa.ResourceManager()
         self.dev = self.rm.open_resource(self.address)
+        self.dev.write('SENS:CALC:MODE 1')
+        self.dev.write('SENS:POW:RANG:IND 8')
+        
+    def set_wavelength(self,wavelength):
+        """ 
+        Description: sets wavelength
 
+        Input: wavelength : float
+        Output: None : None
+        Example: 
+        >>set_wavelength(795)
+
+        """
+        if bool(re.search('PAX1000IR1', self.dev.query('*IDN?'))):
+            if wavelength < 1080 and wavelength > 600:
+                self.dev.write('SENS:CORR:WAV {}'.format(wavelength*1e-9))
+            else:
+                raise ValueError('Wavelength not supported (600-1080nm)')
+        elif bool(re.search('PAX1000IR2', self.dev.query('*IDN?'))):
+            if wavelength < 1700 and wavelength > 900:
+                self.dev.write('SENS:CORR:WAV {}'.format(wavelength*1e-9))
+            else:
+                raise ValueError('Wavelength not supported (900-1700nm)')
+        else:
+            print('check polarimeter connection')
+        return
+
+    def trigger_data_collection(self):
+        """ 
+        Description: opens data collection window
+
+        Input: None : None
+        Output: None : None
+        Example: 
+        >>trigger_data_collection()
+
+        """
+        self.dev.write('INP:ROT:STAT 1')
+        return
+        
+        
+    def close_data_collection(self):
+        """ 
+        Description: closes data collection window
+
+        Input: None : None
+        Output: None : None
+        Example: 
+        >>close_data_collection()
+
+        """
+        self.dev.write('INP:ROT:STAT 0')
+        return
+    
     def get_polarzation_params(self):
         """ 
         Description: Returns the current measured Stokes parameters
@@ -325,3 +394,16 @@ class thorlabs_polarimeter:
         """
         data = self.dev.query('SENS:DATA:LAT?')
         return data
+    
+    def reset(self):
+        """ 
+        Description: resets connection with polarimeter
+
+        Input: None : None
+        Output: Reset of connection : class method
+        """
+        self.dev.close()
+        time.sleep(1)
+        self.dev = self.rm.open_resource(self.address)
+        self.dev.write('*RST')
+        

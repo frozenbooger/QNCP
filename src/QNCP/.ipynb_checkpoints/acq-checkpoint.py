@@ -216,7 +216,7 @@ class Rigol_DS1104:
         self.dev.write(':SINGle')
     
     def screenshot(self,ch):
-        self.dev.write(":WAV:SOUR: CHAN{}".format(ch))
+        self.dev.write(":WAV:SOUR CHAN{}".format(ch))
         self.dev.write(":WAV:MODE NORMal")
         self.dev.write(":WAV:FORM ASC")
         self.dev.write(":WAV:DATA? CHAN{}".format(ch))
@@ -258,7 +258,7 @@ class Rigol_DMO5000:
         self.dev.write(':SINGle')
         
     def screenshot(self,ch):
-        self.dev.write(":WAV:SOUR: CHAN{}".format(ch))
+        self.dev.write(":WAV:SOUR CHAN{}".format(ch))
         self.dev.write(":WAV:MODE NORMal")
         self.dev.write(":WAV:FORM ASC")
         self.dev.write(":WAV:DATA? CHAN{}".format(ch))
@@ -275,22 +275,6 @@ class Rigol_DMO5000:
 #===========================================================================
 # Polarimeter - Thorlabs PAX1000
 #=========================================================================== 
-    
-def list_resources():
-    """ 
-    Description: This function will return all usb connected 
-    devices to a computer in the VISA format. 
-    
-    Input: None : None
-    Output: list of device addresses : List 
-    
-    Example: 
-    >>list_resources()
-    
-    ['ASRL5::INSTR', 'USB::0x1234::125::A22-5::INSTR']
-    """
-    rm = pyvisa.ResourceManager()
-    return rm.list_resources()
 
 class thorlabs_polarimeter:
     def __init__(self,address):

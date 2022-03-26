@@ -1,41 +1,35 @@
-# Using device 
+# Using QNCP 
 
 ## Introduction
 
-The purpose of device is to streamline and versitalize your laboratory workflow. This document will guide you through the prerequisites and use of this library.
+QNCP is currently a library of drivers necessary to the control and monitoring of experimental laboratory setups needing analog signals. A homogenous language of commands has been created towards devloping hardware agnostic protocols for experiments. These drivers lay the bedrock which will serve to configure laboratory instruments to perform parallel and in-series protocols needed in quantum communication experiments. The library has been written over python in order to make the infrastructure accessible and easy to use. 
 
-## Prerequisites
+## Installation
 
-This library will require you download the packages in labinstruments-packages.txt. To do so use the following command:
+To install simply type in 
 
-    pip install labinstruments-packages.txt
+    pip install QNCP
     
-or if conda is used:
-
-    conda install labinstruments-packages.txt
+To update to newest version
+    
+    pip install --upgrade QNCP
     
 ## Instruments 
 
 The different instruments supported by this library are divided into the following categories:
 
-* Generators (gen)
-    * Valon 5105
-    * Rigol DSG830
-    * Rigol DG4202
-    * Quantum Composer
-    * Agilent ESG Signal Generators
+* Generator Instruments (gen)
     
-* Analyzers (acq)
-    * Rigol DS1102Z E
-    * Rigol DSA832
+* Acquisition Instruments (acq)
     
-* Miscellaneous (misc)
-    * MogLabs Agile RF Synthesizer
-    
-For example calling the Rigol DSG830 to change its output frequency to 50 Mhz is as follows:
+For example calling a function generator from the Rigol DG4000 family to change its output frequency to 50 Mhz is as follows:
 
-    gen.Rigol_DSG830.freq(50)
-    
-In general:
+	from QNCP import gen
 
-    type.instrument.command(input)
+    gen.Rigol_DG4000.freq(50)
+    
+This library also has a search functionality for USB (ASRL, GBIP) devices. We can search as follows:
+
+	from QNCP import search, device
+
+	print(search.get_resource('ASRL',device.Quantum_Composers,38400))

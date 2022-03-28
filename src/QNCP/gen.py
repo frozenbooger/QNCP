@@ -219,7 +219,7 @@ class Rigol_DG4000:
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
         self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(freq)))
         self.dev.write("SOURCE{}:VOLTAGE:UNIT VPP".format(ch))
-        self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,max(data)))
+        self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,2*max(data)))
 #         self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
 #         self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
         self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
@@ -230,7 +230,7 @@ class Rigol_DG4000:
     def ext_trig(self,ch):
         self.dev.write("SOURCE{}:BURST:TRIG:SOUR EXT".format(ch))
     
-    def arb_burst(self,ch,freq,cycles,func,*arg):
+    def arb_burst(self,ch,freq,cycles,burst_period,func,*arg):
         total_time = 1/(self.__Hz(freq))
         
         if inspect.ismethod(func) == True:
@@ -245,12 +245,12 @@ class Rigol_DG4000:
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
         self.dev.write('SOURCE{}:Freq {}'.format(ch,self.__Hz(freq)))
         self.dev.write("SOURCE{}:VOLTAGE:UNIT VPP".format(ch))
-        self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,max(data)))
+        self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,2*max(data)))
 #         self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
 #         self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
         self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
         self.dev.write("SOURCE{}:PHASE 0".format(ch))
-        self.dev.write("SOURCE{}:PERIOD {}".format(ch,total_time))
+        self.dev.write("SOURCE{}:PERIOD {}".format(ch,burst_period))
         self.dev.write("SOURCE{}:PHASE:SYNC".format(ch))
         
         #triggered burst

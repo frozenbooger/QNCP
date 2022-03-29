@@ -1,0 +1,12 @@
+matplotlib
+numpy
+numpydoc
+paramiko
+pyvis
+PyVISA
+PyVISA-py
+regex
+scipy
+scp
+visa
+python-vxi11

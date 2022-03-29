@@ -231,6 +231,9 @@ class Rigol_DG4000:
         self.dev.write("SOURCE{}:BURST:TRIG:SOUR EXT".format(ch))
     
     def arb_burst(self,ch,freq,cycles,burst_period,func,*arg):
+        """
+        OBSOLETE : PLEASE MODIFY CODE TO arbitrary_burst() BY APRIL 15 !!!
+        """
         total_time = 1/(self.__Hz(freq))
         
         if inspect.ismethod(func) == True:
@@ -257,6 +260,44 @@ class Rigol_DG4000:
         self.dev.write("SOURCE{}:BURST ON".format(ch))
         self.dev.write("SOURCE{}:BURST:NCYC {}".format(ch,cycles))
         self.dev.write("SOURCE{}:BURST:MODE:TRIG".format(ch))
+        
+    def arbitrary_burst(ch,signal_width,cycles,func,*arg):
+        """
+        Description: Uses N cycle burst functionallity of the Rigol DG4000 Series. Best 
+        suited for external trigger.
+
+        Input: ch : channel : int
+               signal_width : width (time) of the argument in seconds : float
+               cycles : cycles : int
+               func : method or list of values : method or array
+               arg* : arguments of the function : misc
+        Output: None : class method
+        """
+        if inspect.ismethod(func) == True:
+            t = np.linspace(0,signal_width,1000)
+            data = func(t,*arg)
+            datastring = ",".join(map(str, self.normalize(data)))
+        else:
+            data = func
+            datastring = ",".join(map(str, self.normalize(data)))
+
+        self.dev.write('SOURCE{}:Freq {}'.format(ch, 1/signal_width))
+        self.dev.write("OUTPUT{} ON".format(ch))
+        self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
+        self.dev.write("SOURCE{}:VOLTAGE:UNIT VPP".format(ch))
+        self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,2*max(data)))
+        # self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
+        # self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
+        self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
+        self.dev.write("SOURCE{}:PHASE 0".format(ch))
+        self.dev.write("SOURCE{}:PHASE:SYNC".format(ch))
+
+        #triggered burst
+        self.dev.write("SOURCE{}:BURST ON".format(ch))
+        self.dev.write("SOURCE{}:BURST:NCYC {}".format(ch,cycles))
+        self.dev.write("SOURCE{}:BURST:MODE:TRIG".format(ch))
+        self.ext_trig(ch)
+
 
         
 #===========================================================================

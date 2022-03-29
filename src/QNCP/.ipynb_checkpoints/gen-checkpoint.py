@@ -261,7 +261,7 @@ class Rigol_DG4000:
         self.dev.write("SOURCE{}:BURST:NCYC {}".format(ch,cycles))
         self.dev.write("SOURCE{}:BURST:MODE:TRIG".format(ch))
         
-    def arbitrary_burst(ch,signal_width,cycles,func,*arg):
+    def arbitrary_burst(self,ch,signal_width,cycles,func,*arg):
         """
         Description: Uses N cycle burst functionallity of the Rigol DG4000 Series. Best 
         suited for external trigger.

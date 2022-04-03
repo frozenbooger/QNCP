@@ -903,19 +903,19 @@ class tektronix_AFG3000:
 
         else:
             data = waveform
-            datastring = normalize(data)
+            datastring = self.normalize(data)
             m = buffer_size / (datastring.max() - datastring.min())
             b = -m * datastring.min()
             dac_values = (m * datastring + b)
             np.around(dac_values, out=dac_values)
             dac_values = dac_values.astype(np.uint16)    
 
-        neon.dev.write('DATA:DEFine EMEMory,{}'.format(len(data)))
-        neon.dev.write_binary_values("DATA:DATA EMEM1,", dac_values, datatype="H", is_big_endian=True)
-        neon.dev.write("SOURce:FUNC:SHAPE EMEM1")
-        neon.dev.write("SOURce1:VOLTage:LEVel:IMMediate:LOW {}".format(min(data)))
-        neon.dev.write("SOURce1:VOLTage:LEVel:IMMediate:HIGH {}".format(max(data)))
-        neon.dev.write("SOURCE:FREQ {}".format(__Hz(freq)))
+        self.dev.write('DATA:DEFine EMEMory,{}'.format(len(data)))
+        self.dev.write_binary_values("DATA:DATA EMEM1,", dac_values, datatype="H", is_big_endian=True)
+        self.dev.write("SOURce:FUNC:SHAPE EMEM1")
+        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:LOW {}".format(min(data)))
+        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:HIGH {}".format(max(data)))
+        self.dev.write("SOURCE:FREQ {}".format(self.__Hz(freq)))
 
     def ext_trig(self):
         self.dev.write("TRIGger:SEQuence:SOURce EXTernal")
@@ -931,10 +931,10 @@ class tektronix_AFG3000:
         Output: 
         """
         modes = ['TRIGgered','GATed','INFinity']
-        helium.dev.write('SOURce{}:BURSt:MODE {}'.format(ch,modes[mode]))
-        helium.dev.write('SOURce{}:BURSt:TRIGger:SOURce EXT'.format(ch))
-        helium.dev.write('SOURce{}:BURSt:NCYCles {}'.format(ch,cycles))
-        helium.dev.write('SOURce{}:BURSt ON'.format(ch))
+        self.dev.write('SOURce{}:BURSt:MODE {}'.format(ch,modes[mode]))
+        self.dev.write('SOURce{}:BURSt:TRIGger:SOURce EXT'.format(ch))
+        self.dev.write('SOURce{}:BURSt:NCYCles {}'.format(ch,cycles))
+        self.dev.write('SOURce{}:BURSt ON'.format(ch))
     
     def DC(offset):
         """

@@ -207,7 +207,7 @@ class Rigol_DG4000:
     def square(self,t,leadingedge,width,amp): #square pulse with duty cycle
         return np.piecewise(t,[(t<=leadingedge),((t>leadingedge) & (t<leadingedge+width)),(t>=leadingedge+width)],[0,amp,0])
     
-    def normalize(waveform):
+    def normalize(self,waveform):
         """
         Description: Normalizes data for arbitrary waveform design, points are limited (Tested 04/03/2022)
         to -1 to 1 Volt
@@ -218,7 +218,7 @@ class Rigol_DG4000:
         """
         return np.array(waveform)/np.absolute(max(waveform))
         
-    def arbitrary(ch, signal_width, waveform, *arg):
+    def arbitrary(self, ch, signal_width, waveform, *arg):
         """
         Description: Allows one to set and create arbitrary waveform output (Tested 04/03/2022) 
 
@@ -245,7 +245,7 @@ class Rigol_DG4000:
         self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
         self.dev.write("SOURCE{}:PHASE:SYNC".format(ch))
     
-    def burst(ch, mode, cycles):
+    def burst(self, ch, mode, cycles):
         """
         Description: Allows on to use burst functionallity (Tested 04/03/2022)
 
@@ -261,7 +261,7 @@ class Rigol_DG4000:
         self.dev.write('SOURce{}:BURSt:NCYCles {}'.format(ch,cycles))
         self.dev.write('SOURce{}:BURSt ON'.format(ch))
         
-    def DC(ch, offset):
+    def DC(self, ch, offset):
         """
         Description: Enables DC Mode (Tested 04/03/2022)
 
@@ -865,7 +865,7 @@ class tektronix_AFG3000:
     def square(self,t,leadingedge,width,amp): #square pulse with duty cycle
         return np.piecewise(t,[(t<=leadingedge),((t>leadingedge) & (t<leadingedge+width)),(t>=leadingedge+width)],[0,amp,0])
     
-    def normalize(waveform):
+    def normalize(self, waveform):
         """
         Description: Normalizes data for arbitrary waveform design, points are limited
         to -1 to 1 Volt
@@ -876,7 +876,7 @@ class tektronix_AFG3000:
         """
         return np.array(waveform)/np.absolute(max(waveform))
     
-    def arbitrary(signal_width, waveform, *arg):
+    def arbitrary(self, signal_width, waveform, *arg):
         """
         Description: Allows one to set and create arbitrary waveform output 
 
@@ -920,7 +920,7 @@ class tektronix_AFG3000:
     def ext_trig(self):
         self.dev.write("TRIGger:SEQuence:SOURce EXTernal")
     
-    def burst(ch, mode, cycles):
+    def burst(self, ch, mode, cycles):
         """
         Description: Allows on to use burst functionallity
 
@@ -936,7 +936,7 @@ class tektronix_AFG3000:
         self.dev.write('SOURce{}:BURSt:NCYCles {}'.format(ch,cycles))
         self.dev.write('SOURce{}:BURSt ON'.format(ch))
     
-    def DC(offset):
+    def DC(self, offset):
         """
         Description: Enables DC Mode (Tested 04/03/2022)
 

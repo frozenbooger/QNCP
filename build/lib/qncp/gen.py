@@ -241,8 +241,12 @@ class Rigol_DG4000:
         self.dev.write('SOURCE{}:Freq {}'.format(ch, 1/signal_width))
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch) + datastring)
         self.dev.write("SOURCE{}:FUNC VOLATILE,".format(ch))
-        self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
-        self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
+        if len(data[data < 0]) == 0:
+            self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)-(max(data)-min(data))))
+            self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,min(data)+(max(data)-min(data))))
+        else: 
+            self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
+            self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
         self.dev.write("SOURCE{}:PHASE:SYNC".format(ch))
     
     def burst(self, ch, mode, cycles):
@@ -887,8 +891,13 @@ class tektronix_AFG3000:
         Output: None : class method
         """
         buffer_size = 2**14-2
-        data[0] = 0
-        data[-1] = data[0]
+        
+        if data[0] != data[-1]:
+            data[0] = 0
+            data[-1] = data[0]
+        else:
+            pass
+        
         if inspect.ismethod(waveform) == True:
 
             t = np.linspace(0,total_time,buffer_size)

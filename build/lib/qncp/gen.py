@@ -891,9 +891,9 @@ class tektronix_AFG3000:
         """
         buffer_size = 2**14-2
         
-        if data[0] != data[-1]:
-            data[0] = 0
-            data[-1] = data[0]
+        if waveform[0] != waveform[-1]:
+            waveform[0] = 0
+            waveform[-1] = waveform[0]
         else:
             pass
         
@@ -924,7 +924,7 @@ class tektronix_AFG3000:
         self.dev.write("SOURce:FUNC:SHAPE EMEM1")
         self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:LOW {}".format(-factor))
         self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:HIGH {}".format(factor))
-        self.dev.write("SOURCE:FREQ {}".format(self.__Hz(freq)))
+        self.dev.write("SOURCE:FREQ {}".format(self.__Hz(1/signal_width)))
 
     def ext_trig(self):
         self.dev.write("TRIGger:SEQuence:SOURce EXTernal")

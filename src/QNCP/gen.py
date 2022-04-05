@@ -216,7 +216,8 @@ class Rigol_DG4000:
 
         Output: np.array(waveform)/np.absolute(max(waveform)) : normalized data :  np.array or list
         """
-        return np.array(waveform)/np.absolute(max(waveform))
+        factor = max([np.abs(max(waveform)),np.abs(min(waveform))])
+        return np.array(waveform)/np.absolute(factor)
         
     def arbitrary(self, ch, signal_width, waveform, *arg):
         """
@@ -237,16 +238,13 @@ class Rigol_DG4000:
         else:
             data = np.around(waveform,4)
             datastring = ",".join(map(str,self.normalize(data)))
-
+        
+        factor = max([np.abs(max(data)),np.abs(min(data))])
         self.dev.write('SOURCE{}:Freq {}'.format(ch, 1/signal_width))
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch) + datastring)
         self.dev.write("SOURCE{}:FUNC VOLATILE,".format(ch))
-        if len(data[data < 0]) == 0:
-            self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)-(max(data)-min(data))))
-            self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,min(data)+(max(data)-min(data))))
-        else: 
-            self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
-            self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
+        self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,-factor))
+        self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,factor))
         self.dev.write("SOURCE{}:PHASE:SYNC".format(ch))
     
     def burst(self, ch, mode, cycles):
@@ -878,7 +876,8 @@ class tektronix_AFG3000:
 
         Output: np.array(waveform)/np.absolute(max(waveform)) : normalized data :  np.array or list
         """
-        return np.array(waveform)/np.absolute(max(waveform))
+        factor = max([np.abs(max(waveform)),np.abs(min(waveform))])
+        return np.array(waveform)/np.absolute(factor)
     
     def arbitrary(self, signal_width, waveform, *arg):
         """
@@ -918,12 +917,13 @@ class tektronix_AFG3000:
             dac_values = (m * datastring + b)
             np.around(dac_values, out=dac_values)
             dac_values = dac_values.astype(np.uint16)    
-
+            
+        factor = max([np.abs(max(data)),np.abs(min(data))])
         self.dev.write('DATA:DEFine EMEMory,{}'.format(len(data)))
         self.dev.write_binary_values("DATA:DATA EMEM1,", dac_values, datatype="H", is_big_endian=True)
         self.dev.write("SOURce:FUNC:SHAPE EMEM1")
-        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:LOW {}".format(min(data)))
-        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:HIGH {}".format(max(data)))
+        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:LOW {}".format(-factor))
+        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:HIGH {}".format(factor))
         self.dev.write("SOURCE:FREQ {}".format(self.__Hz(freq)))
 
     def ext_trig(self):

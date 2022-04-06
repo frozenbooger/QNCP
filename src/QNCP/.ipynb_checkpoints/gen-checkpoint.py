@@ -929,21 +929,19 @@ class tektronix_AFG3000:
     def ext_trig(self):
         self.dev.write("TRIGger:SEQuence:SOURce EXTernal")
     
-    def burst(self, ch, mode, cycles):
+    def burst(self, mode, cycles):
         """
         Description: Allows on to use burst functionallity
 
-        Input: ch : channel : int
-               mode : burst mode : int = {'TRIG' = 0, 'GAT' = 1,'INF' = 2}
+        Input: mode : burst mode : int = {'TRIG' = 0, 'GAT' = 1}
                cycles : cycles : int
 
         Output: 
         """
-        modes = ['TRIGgered','GATed','INFinity']
-        self.dev.write('SOURce{}:BURSt:MODE {}'.format(ch,modes[mode]))
-        self.dev.write('SOURce{}:BURSt:TRIGger:SOURce EXT'.format(ch))
-        self.dev.write('SOURce{}:BURSt:NCYCles {}'.format(ch,cycles))
-        self.dev.write('SOURce{}:BURSt ON'.format(ch))
+        modes = ['TRIG','GAT']
+        self.dev.write("SOURCE:BURSt:MODE {}".format(modes[mode]))
+        self.dev.write("SOURCE:BURSt:NCYC {}".format(cycles))
+        self.dev.write("SOURCE:BURSt:STAT ON")
     
     def DC(self, offset):
         """

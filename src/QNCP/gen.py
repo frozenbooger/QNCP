@@ -818,7 +818,7 @@ class tektronix_AFG3000:
     def freq(self,f):
         self.dev.write('SOURce:FREQuency:FIXed {}'.format(self.__Hz(f)));
 
-    def __Hz(f): 
+    def __Hz(self, f): 
         """
         Description: Sets all frequencies to MHz Unit
 

@@ -272,6 +272,10 @@ class Rigol_DMO5000:
         
         return time_data,volt_data
     
+    def scale_offset(self, ch, scale, offset):
+        self.dev.write(':CHANnel{}:SCAL {}'.format(ch,scale))
+        self.dev.write(':CHANnel{}:OFFS {}'.format(ch,offset))
+    
 #===========================================================================
 # Polarimeter - Thorlabs PAX1000
 #=========================================================================== 

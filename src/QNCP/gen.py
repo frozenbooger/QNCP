@@ -851,7 +851,7 @@ class tektronix_AFG3000:
         self.dev.write('SOURCe:VOLTage:UNIT VPP')
 
     def offset(self,offset):  # V_DC
-        self.dev.write('SOURC:VOLTage:OFFSet {}'.format(offset));
+        self.dev.write('SOURce:VOLTage:LEVel:IMMediate:OFFSet {}'.format(offset));
 
     def phase(self,phase):
         self.dev.write('SOURC:PHASe {}'.format(phase));
@@ -859,7 +859,7 @@ class tektronix_AFG3000:
     def burst_delay(self,tdelay):
         self.dev.write('SOUR:BURS:TDEL {}ns'.format(tdelay))
         
-    def gaussian(self,t,mu,FWHM,a): #Gaussian Function. Inputs: (FWHM, Amplitude, Center)
+    def gaussian(self,t,mu,FWHM,a): #Gaussian Function. Inputs: (Center, FWHM, Amplitude)
         sigma = (FWHM)/(2*np.sqrt(2*np.log(2)))
         amplitude = np.sqrt(2*np.pi*sigma**2)*a
         return amplitude*( 1/(sigma * np.sqrt(2*np.pi) ) )*np.exp( -((t-mu)**2 / (2*sigma**2)) )
@@ -893,7 +893,7 @@ class tektronix_AFG3000:
         
         if inspect.ismethod(waveform) == True:
 
-            t = np.linspace(0,total_time,buffer_size)
+            t = np.linspace(0,signal_width,buffer_size)
             data = waveform(t,*arg)
 
             datastring = self.normalize(data)

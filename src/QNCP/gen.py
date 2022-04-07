@@ -891,12 +891,6 @@ class tektronix_AFG3000:
         """
         buffer_size = 2**14-2
         
-        if waveform[0] != waveform[-1]:
-            waveform[0] = 0
-            waveform[-1] = waveform[0]
-        else:
-            pass
-        
         if inspect.ismethod(waveform) == True:
 
             t = np.linspace(0,total_time,buffer_size)
@@ -916,14 +910,19 @@ class tektronix_AFG3000:
             b = -m * datastring.min()
             dac_values = (m * datastring + b)
             np.around(dac_values, out=dac_values)
-            dac_values = dac_values.astype(np.uint16)    
+            dac_values = dac_values.astype(np.uint16)
             
-        factor = max([np.abs(max(data)),np.abs(min(data))])
+        if data[0] != data[-1]:
+            data[0] = 0
+            data[-1] = data[0]
+        else:
+            pass
+            
         self.dev.write('DATA:DEFine EMEMory,{}'.format(len(data)))
         self.dev.write_binary_values("DATA:DATA EMEM1,", dac_values, datatype="H", is_big_endian=True)
         self.dev.write("SOURce:FUNC:SHAPE EMEM1")
-        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:LOW {}".format(-factor))
-        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:HIGH {}".format(factor))
+        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:LOW {}".format(min(data)))
+        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:HIGH {}".format(max(data)))
         self.dev.write("SOURCE:FREQ {}".format(self.__Hz(1/signal_width)))
 
     def ext_trig(self):

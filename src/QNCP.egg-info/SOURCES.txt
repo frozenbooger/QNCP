@@ -11,3 +11,4 @@ src/qncp/acq.py
 src/qncp/device.py
 src/qncp/gen.py
 src/qncp/search.py
+src/qncp/storage.py

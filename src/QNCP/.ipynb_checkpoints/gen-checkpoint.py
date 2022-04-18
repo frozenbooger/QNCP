@@ -199,15 +199,18 @@ class Rigol_DG4000:
     def phase(self,ch,p):
         self.dev.write(':SOURCe{}:PHASe {}'.format(ch,p));
         
-    def gaussian(self,t,mu,FWHM,a): #Gaussian Function. Inputs: (FWHM, Amplitude, Center)
+    @staticmethod    
+    def gaussian(t,mu,FWHM,a): #Gaussian Function. Inputs: (FWHM, Amplitude, Center)
         sigma = (FWHM)/(2*np.sqrt(2*np.log(2)))
         amplitude = np.sqrt(2*np.pi*sigma**2)*a
         return amplitude*( 1/(sigma * np.sqrt(2*np.pi) ) )*np.exp( -((t-mu)**2 / (2*sigma**2)) )
     
-    def square(self,t,leadingedge,width,amp): #square pulse with duty cycle
+    @staticmethod
+    def square(t,leadingedge,width,amp): #square pulse with duty cycle
         return np.piecewise(t,[(t<=leadingedge),((t>leadingedge) & (t<leadingedge+width)),(t>=leadingedge+width)],[0,amp,0])
     
-    def normalize(self,waveform):
+    @staticmethod
+    def normalize(waveform):
         """
         Description: Normalizes data for arbitrary waveform design, points are limited (Tested 04/03/2022)
         to -1 to 1 Volt
@@ -231,7 +234,7 @@ class Rigol_DG4000:
         Output: None : class method
         """
         buffer_size = 2**14
-        if inspect.ismethod(waveform) == True:
+        if inspect.ismethod(waveform) == True or inspect.isfunction(waveform) == True:
             t = np.linspace(0,signal_width,buffer_size)
             data = np.around(waveform(t,*arg),4)
             datastring = ",".join(map(str,self.normalize(data)))
@@ -290,7 +293,7 @@ class Rigol_DG4000:
                arg* : arguments of the function : misc
         Output: None : class method
         """
-        if inspect.ismethod(func) == True:
+        if inspect.ismethod(waveform) == True or inspect.isfunction(waveform) == True:
             t = np.linspace(0,signal_width,1000)
             data = func(t,*arg)
             datastring = ",".join(map(str, self.normalize(data)))
@@ -858,16 +861,19 @@ class tektronix_AFG3000:
         
     def burst_delay(self,tdelay):
         self.dev.write('SOUR:BURS:TDEL {}ns'.format(tdelay))
-        
-    def gaussian(self,t,mu,FWHM,a): #Gaussian Function. Inputs: (Center, FWHM, Amplitude)
+    
+    @staticmethod
+    def gaussian(t,mu,FWHM,a): #Gaussian Function. Inputs: (Center, FWHM, Amplitude)
         sigma = (FWHM)/(2*np.sqrt(2*np.log(2)))
         amplitude = np.sqrt(2*np.pi*sigma**2)*a
         return amplitude*( 1/(sigma * np.sqrt(2*np.pi) ) )*np.exp( -((t-mu)**2 / (2*sigma**2)) )
     
-    def square(self,t,leadingedge,width,amp): #square pulse with duty cycle
+    @staticmethod
+    def square(t,leadingedge,width,amp): #square pulse with duty cycle
         return np.piecewise(t,[(t<=leadingedge),((t>leadingedge) & (t<leadingedge+width)),(t>=leadingedge+width)],[0,amp,0])
     
-    def normalize(self, waveform):
+    @staticmethod
+    def normalize(waveform):
         """
         Description: Normalizes data for arbitrary waveform design, points are limited
         to -1 to 1 Volt
@@ -891,7 +897,7 @@ class tektronix_AFG3000:
         """
         buffer_size = 2**14-2
         
-        if inspect.ismethod(waveform) == True:
+        if inspect.ismethod(waveform) == True or inspect.isfunction(waveform) == True:
 
             t = np.linspace(0,signal_width,buffer_size)
             data = waveform(t,*arg)

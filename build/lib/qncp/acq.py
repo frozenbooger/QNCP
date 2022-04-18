@@ -8,55 +8,6 @@ from scipy.signal import find_peaks
 import inspect
 import vxi11
 import time
-#===========================================================================
-# Oscilloscope - Rigol DS1000E series 
-#===========================================================================            
-class Rigol_DS1000E:
-    def __init__(self,address): # 'TCPIP::<IP ADDRESS>::INSTR'
-        self.address = address
-        self.rm = pyvisa.ResourceManager()
-        self.dev = self.rm.open_resource(self.address)
-        self.run()
-
-    def meas(self,ch,var):  # measure 
-        if type(ch) == str:  # channel info
-            __ch = re.search('\d',ch).group()
-        else:
-            __ch = ch
-        
-        __readOut = self.dev.query(':MEASure:ITEM? {}, CHAN{}'.format(var,__ch))
-        __value = float(re.search('.*(?=\n)',__readOut).group())
-        return __value
-    def run(self):
-        self.dev.write(':RUN')
-    def stop(self):
-        self.dev.write(':STOP')
-    def single(self):
-        self.dev.write(':SINGle')
-    
-    def config(self,ch,cfg):  # specifically designed for Pete lock error monitor
-        if type(ch) == str:  # channel info, default ch2
-            __ch = re.search('\d',ch).group()
-        else:
-            __ch = ch
-            
-        # pete lock error monitor
-        if re.search('(pete)',cfg,re.IGNORECASE) != None:
-            __tPID = 120e-6    # PID response time in Pete
-            __tDiv = 10e-6    # second/div
-            __tOffset = __tPID + 12*__tDiv    # offset
-            __vTrig = 0    # trigger level
-            __vScale = 0.5    # 500mV/div, 
-            self.run()
-            self.dev.write(':TIMebase:SCALe {}'.format(__tDiv))   # time scale 10us/div
-            self.dev.write(':TIMebase:MAIN:OFFSet {}'.format(__tOffset))            
-            self.dev.write(':CHAN{}:COUPling DC'.format(__ch))  # DC coupling
-            self.dev.write(':CHAN{}:SCALe {}'.format(__ch,__vScale)) 
-            self.dev.write(':CHAN{}:OFFSet 0'.format(__ch))  # DC coupling
-            self.dev.write(':TRIG:MODE EDGE')  # trigger on edge
-            self.dev.write(':TRIG:SWEep AUTO')  # force trigger when not triggered
-            self.dev.write(':TRIG:EDGe:SOURce CHAN{}'.format(__ch))  #trigger
-            self.dev.write(':TRIG:EDGe:LEV {}'.format(__vTrig))  
             
 #================================================================
 # Spectrum Analyzer - Rigol_DSA800 series 
@@ -187,12 +138,12 @@ class Rigol_DSA800:
         amps=peaks[1::2]
         
         return freqs,amps
-
+    
 #===========================================================================
-# Oscilloscope DS1104
+# Oscilloscope - Rigol DS1000E series 
 #===========================================================================            
-class Rigol_DS1104:
-    def __init__(self,address):
+class Rigol_DS1000E:
+    def __init__(self,address): # 'TCPIP::<IP ADDRESS>::INSTR'
         self.address = address
         self.rm = pyvisa.ResourceManager()
         self.dev = self.rm.open_resource(self.address)
@@ -207,7 +158,6 @@ class Rigol_DS1104:
         __readOut = self.dev.query(':MEASure:ITEM? {}, CHAN{}'.format(var,__ch))
         __value = float(re.search('.*(?=\n)',__readOut).group())
         return __value
-    
     def run(self):
         self.dev.write(':RUN')
     def stop(self):
@@ -215,20 +165,103 @@ class Rigol_DS1104:
     def single(self):
         self.dev.write(':SINGle')
     
+    def config(self,ch,cfg):  # specifically designed for Pete lock error monitor
+        if type(ch) == str:  # channel info, default ch2
+            __ch = re.search('\d',ch).group()
+        else:
+            __ch = ch
+            
+        # pete lock error monitor
+        if re.search('(pete)',cfg,re.IGNORECASE) != None:
+            __tPID = 120e-6    # PID response time in Pete
+            __tDiv = 10e-6    # second/div
+            __tOffset = __tPID + 12*__tDiv    # offset
+            __vTrig = 0    # trigger level
+            __vScale = 0.5    # 500mV/div, 
+            self.run()
+            self.dev.write(':TIMebase:SCALe {}'.format(__tDiv))   # time scale 10us/div
+            self.dev.write(':TIMebase:MAIN:OFFSet {}'.format(__tOffset))            
+            self.dev.write(':CHAN{}:COUPling DC'.format(__ch))  # DC coupling
+            self.dev.write(':CHAN{}:SCALe {}'.format(__ch,__vScale)) 
+            self.dev.write(':CHAN{}:OFFSet 0'.format(__ch))  # DC coupling
+            self.dev.write(':TRIG:MODE EDGE')  # trigger on edge
+            self.dev.write(':TRIG:SWEep AUTO')  # force trigger when not triggered
+            self.dev.write(':TRIG:EDGe:SOURce CHAN{}'.format(__ch))  #trigger
+            self.dev.write(':TRIG:EDGe:LEV {}'.format(__vTrig))      
+
+#===========================================================================
+# Oscilloscope DS1000z Series
+#===========================================================================            
+class Rigol_DS1000z:
+    def __init__(self,address):
+        self.address = address
+        self.rm = pyvisa.ResourceManager()
+        self.dev = self.rm.open_resource(self.address)
+        self.run()
+
+    def measure(self,ch,var):  # measure 
+        if type(ch) == str:  # channel info
+            __ch = re.search('\d',ch).group()
+        else:
+            __ch = ch
+        __readOut = self.dev.query(':MEASure:ITEM? {}, CHAN{}'.format(var,__ch))
+        __value = float(re.search('.*(?=\n)',__readOut).group())
+        return __value
+    
+    def run(self):
+        self.dev.write(':RUN')
+        
+    def stop(self):
+        self.dev.write(':STOP')
+        
+    def single(self):
+        self.dev.write(':SINGle')
+    
     def screenshot(self,ch):
+        """ 
+        Description: The screenshot function acquires the time and voltage information
+        from the oscilliscope at the oscilliscopes current settings
+
+        Input: ch : channel : integer = {1,2,3,4}
+        Output: time_data : array which has timing information : np.array
+                volt_data : array which has voltage infromation : np.array
+        Example: 
+        >> acq1.screenshot(ch1)
+
+        np.array([0,1,2,3,4,...,99,100]),np.array([0,1,2,3,2,...,2,3])
+        """
         self.dev.write(":WAV:SOUR CHAN{}".format(ch))
         self.dev.write(":WAV:MODE NORMal")
         self.dev.write(":WAV:FORM ASC")
         self.dev.write(":WAV:DATA? CHAN{}".format(ch))
+
         rawdata = self.dev.read_raw()
         rawdata = rawdata.decode('UTF-8')
-        volt_data = rawdata[11:-2] #removes header and ending of data
+        volt_data = rawdata[11:] #removes header and ending of data
         volt_data = np.array([float(volt_data) for volt_data in volt_data.split(',')])
-        
+
         t = float(self.dev.query(':WAVeform:XINCrement?'))
         time_data = np.arange(0,t*len(volt_data),t)
-        
-        return time_data,volt_data
+
+        return time_data, volt_data
+    
+    def scale_offset(self, ch, scale, offset):
+        """ 
+        Description: The scale_offset function sets the scale and offset parameters of an 
+        oscilliscope channel to the scale of choice 
+
+        Input: ch : channel : integer = {1,2,3,4}
+               scale : usually in the order of your signal/8 : float
+               offset : usually a multiple of the scale : float
+               
+        Output: None : none : None
+        Example: 
+        >> acq1.scale_offset(ch, (max_volt-min_volt)/8, -(max_volt-min_volt)/4)
+
+        np.array([0,1,2,3,4,...,99,100]),np.array([0,1,2,3,2,...,2,3])
+        """
+        self.dev.write(':CHANnel{}:SCAL {}'.format(ch,scale))
+        self.dev.write(':CHANnel{}:OFFS {}'.format(ch,offset))
 
 #===========================================================================
 # Oscilloscope - Rigol DMO5000
@@ -241,7 +274,7 @@ class Rigol_DMO5000:
         self.dev = self.rm.open_resource(self.address)
         self.run()
 
-    def meas(self,ch,var):  # measure 
+    def measure(self,ch,var):  # measure 
         if type(ch) == str:  # channel info
             __ch = re.search('\d',ch).group()
         else:
@@ -250,27 +283,43 @@ class Rigol_DMO5000:
         __readOut = self.dev.query(':MEASure:ITEM? {}, CHAN{}'.format(var,__ch))
         __value = float(re.search('.*(?=\n)',__readOut).group())
         return __value
+    
     def run(self):
         self.dev.write(':RUN')
+        
     def stop(self):
         self.dev.write(':STOP')
+        
     def single(self):
         self.dev.write(':SINGle')
         
     def screenshot(self,ch):
+        """ 
+        Description: The screenshot function acquires the time and voltage information
+        from the oscilliscope at the oscilliscopes current settings
+
+        Input: ch : channel : integer = {1,2,3,4}
+        Output: time_data : array which has timing information : np.array
+                volt_data : array which has voltage infromation : np.array
+        Example: 
+        >> acq1.screenshot(ch1)
+
+        np.array([0,1,2,3,4,...,99,100]),np.array([0,1,2,3,2,...,2,3])
+        """
         self.dev.write(":WAV:SOUR CHAN{}".format(ch))
         self.dev.write(":WAV:MODE NORMal")
         self.dev.write(":WAV:FORM ASC")
         self.dev.write(":WAV:DATA? CHAN{}".format(ch))
+
         rawdata = self.dev.read_raw()
         rawdata = rawdata.decode('UTF-8')
-        volt_data = rawdata[11:-2] #removes header and ending of data
+        volt_data = rawdata[11:] #removes header and ending of data
         volt_data = np.array([float(volt_data) for volt_data in volt_data.split(',')])
-        
+
         t = float(self.dev.query(':WAVeform:XINCrement?'))
         time_data = np.arange(0,t*len(volt_data),t)
-        
-        return time_data,volt_data
+
+        return time_data, volt_data
     
     def scale_offset(self, ch, scale, offset):
         self.dev.write(':CHANnel{}:SCAL {}'.format(ch,scale))

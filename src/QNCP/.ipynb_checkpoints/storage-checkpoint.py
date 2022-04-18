@@ -1,10 +1,11 @@
 import inspect
 from scipy.ndimage import interpolation
+import numpy as np
+import matplotlib.pyplot as plt 
 
 class storage_process():
-    
     def __init__(self, total_time):
-         """ 
+        """ 
         Description: intializes a storage process which will drive the pulsing 
         on EIT-based quantum memories
 

@@ -313,7 +313,7 @@ class Rigol_DMO5000:
 
         rawdata = self.dev.read_raw()
         rawdata = rawdata.decode('UTF-8')
-        volt_data = rawdata[11:] #removes header and ending of data
+        volt_data = rawdata[11:-2] #removes header and ending of data
         volt_data = np.array([float(volt_data) for volt_data in volt_data.split(',')])
 
         t = float(self.dev.query(':WAVeform:XINCrement?'))

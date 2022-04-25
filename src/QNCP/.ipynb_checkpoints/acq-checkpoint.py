@@ -262,6 +262,9 @@ class Rigol_DS1000z:
         """
         self.dev.write(':CHANnel{}:SCAL {}'.format(ch,scale))
         self.dev.write(':CHANnel{}:OFFS {}'.format(ch,offset))
+        
+    def channel_state(self, ch, state):
+        self.dev.write(':CHANnel{}:DISPlay {}'.format(ch,state))
 
 #===========================================================================
 # Oscilloscope - Rigol DMO5000
@@ -324,6 +327,9 @@ class Rigol_DMO5000:
     def scale_offset(self, ch, scale, offset):
         self.dev.write(':CHANnel{}:SCAL {}'.format(ch,scale))
         self.dev.write(':CHANnel{}:OFFS {}'.format(ch,offset))
+        
+    def channel_state(self, ch, state):
+        self.dev.write(':CHANnel{}:DISPlay {}'.format(ch,state))
     
 #===========================================================================
 # Polarimeter - Thorlabs PAX1000

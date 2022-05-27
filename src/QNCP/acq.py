@@ -322,7 +322,7 @@ class Rigol_DMO5000:
         t = float(self.dev.query(':WAVeform:XINCrement?'))
         time_data = np.arange(0,t*len(volt_data),t)
 
-        return time_data, volt_data
+        return time_data[0:len(volt_data)], volt_data
     
     def scale_offset(self, ch, scale, offset):
         """ 

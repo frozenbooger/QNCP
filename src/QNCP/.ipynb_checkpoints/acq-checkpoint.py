@@ -325,8 +325,22 @@ class Rigol_DMO5000:
         return time_data, volt_data
     
     def scale_offset(self, ch, scale, offset):
-        self.dev.write(':CHANnel{}:SCAL {}'.format(ch,scale))
-        self.dev.write(':CHANnel{}:OFFS {}'.format(ch,offset))
+        """ 
+        Description: The scale_offset function sets the scale and offset parameters of an 
+        oscilliscope channel to the scale of choice 
+
+        Input: ch : channel : integer = {1,2,3,4}
+               scale : usually in the order of your signal/8 : float
+               offset : usually a multiple of the scale : float
+               
+        Output: None : none : None
+        Example: 
+        >> acq1.scale_offset(ch, (max_volt-min_volt)/8, -(max_volt-min_volt)/4)
+
+        np.array([0,1,2,3,4,...,99,100]),np.array([0,1,2,3,2,...,2,3])
+        """
+        self.dev.write(':CHANnel{}:SCAL {}'.format(ch,np.round(scale,4)))
+        self.dev.write(':CHANnel{}:OFFS {}'.format(ch,np.round(offset,4)))
         
     def channel_state(self, ch, state):
         self.dev.write(':CHANnel{}:DISPlay {}'.format(ch,state))

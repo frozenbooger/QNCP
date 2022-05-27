@@ -224,7 +224,7 @@ class Rigol_DG4000:
         
     def arbitrary(self, ch, signal_width, waveform, *arg):
         """
-        Description: Allows one to set and create arbitrary waveform output (Tested 04/03/2022) 
+        Description: Allows one to set and create arbitrary waveform output (Tested 05/27/2022) 
 
         Input: ch : channel : int
                signal_width : width (time) of the argument in seconds : float
@@ -236,11 +236,11 @@ class Rigol_DG4000:
         buffer_size = 2**14
         if inspect.ismethod(waveform) == True or inspect.isfunction(waveform) == True:
             t = np.linspace(0,signal_width,buffer_size)
-            data = np.around(waveform(t,*arg),4)
-            datastring = ",".join(map(str,self.normalize(data)))
+            data = waveform(t,*arg)
+            datastring = ",".join(map(str,np.round(self.normalize(data),4)))
         else:
-            data = np.around(waveform,4)
-            datastring = ",".join(map(str,self.normalize(data)))
+            data = waveform
+            datastring = ",".join(map(str,np.round(self.normalize(data),4)))
         
         factor = max([np.abs(max(data)),np.abs(min(data))])
         self.dev.write('SOURCE{}:Freq {}'.format(ch, 1/signal_width))

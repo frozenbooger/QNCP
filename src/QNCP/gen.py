@@ -853,13 +853,13 @@ class tektronix_AFG3000:
         self.dev.write('SOURCe{}:VOLTage {}'.format(ch,__V))
         self.dev.write('SOURCe{}:VOLTage:UNIT VPP')
 
-    def offset(self,offset):  # V_DC
+    def offset(self,ch,offset):  # V_DC
         self.dev.write('SOURce{}:VOLTage:LEVel:IMMediate:OFFSet {}'.format(ch,offset));
 
-    def phase(self,phase):
+    def phase(self,ch,phase):
         self.dev.write('SOURce{}:PHASe {}'.format(ch,phase));
         
-    def burst_delay(self,tdelay):
+    def burst_delay(self,ch,tdelay):
         self.dev.write('SOURce{}:BURS:TDEL {}ns'.format(ch,tdelay))
     
     @staticmethod

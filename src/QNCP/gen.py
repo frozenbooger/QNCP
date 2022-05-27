@@ -818,8 +818,8 @@ class tektronix_AFG3000:
     def on(self): # default: both 
         self.dev.write(':OUTPut ON')
 
-    def freq(self,f):
-        self.dev.write('SOURce:FREQuency:FIXed {}'.format(self.__Hz(f)));
+    def freq(self,ch,f):
+        self.dev.write('SOURce{}:FREQuency:FIXed {}'.format(ch,self.__Hz(f)));
 
     def __Hz(self, f): 
         """
@@ -839,28 +839,28 @@ class tektronix_AFG3000:
         else: # float, or str that contains only numbers
             return float(f)*1e6
 
-    def lev(self,v):
+    def lev(self,ch,v):
         if type(v) == str:
             __V = float(re.sub('[a-zA-Z]','',v))  # unitless value
             if re.search('[rR]',v) != None:  #  VRMS
-                self.dev.write('SOURCe:VOLTage:UNIT VRMS')
+                self.dev.write('SOURCe:VOLTage:UNIT VRMS'.format(ch))
             elif re.search('[dD]',v) != None:  # dBm
-                self.dev.write('SOURCe:VOLTage:UNIT DBM')
+                self.dev.write('SOURCe:VOLTage:UNIT DBM'.format(ch))
         else:  # default: [Vpp] 
             __V = v
-            self.dev.write(':SOURCe:VOLTage:UNIT VPP')
+            self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
 
-        self.dev.write('SOURCe:VOLTage {}'.format(__V))
-        self.dev.write('SOURCe:VOLTage:UNIT VPP')
+        self.dev.write('SOURCe{}:VOLTage {}'.format(ch,__V))
+        self.dev.write('SOURCe{}:VOLTage:UNIT VPP')
 
     def offset(self,offset):  # V_DC
-        self.dev.write('SOURce:VOLTage:LEVel:IMMediate:OFFSet {}'.format(offset));
+        self.dev.write('SOURce{}:VOLTage:LEVel:IMMediate:OFFSet {}'.format(ch,offset));
 
     def phase(self,phase):
-        self.dev.write('SOURC:PHASe {}'.format(phase));
+        self.dev.write('SOURce{}:PHASe {}'.format(ch,phase));
         
     def burst_delay(self,tdelay):
-        self.dev.write('SOUR:BURS:TDEL {}ns'.format(tdelay))
+        self.dev.write('SOURce{}:BURS:TDEL {}ns'.format(ch,tdelay))
     
     @staticmethod
     def gaussian(t,mu,FWHM,a): #Gaussian Function. Inputs: (Center, FWHM, Amplitude)
@@ -885,7 +885,7 @@ class tektronix_AFG3000:
         factor = max([np.abs(max(waveform)),np.abs(min(waveform))])
         return np.array(waveform)/np.absolute(factor)
     
-    def arbitrary(self, signal_width, waveform, *arg):
+    def arbitrary(self, ch, signal_width, waveform, *arg):
         """
         Description: Allows one to set and create arbitrary waveform output 
 
@@ -926,15 +926,15 @@ class tektronix_AFG3000:
             
         self.dev.write('DATA:DEFine EMEMory,{}'.format(len(data)))
         self.dev.write_binary_values("DATA:DATA EMEM1,", dac_values, datatype="H", is_big_endian=True)
-        self.dev.write("SOURce:FUNC:SHAPE EMEM1")
-        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:LOW {}".format(min(data)))
-        self.dev.write("SOURce1:VOLTage:LEVel:IMMediate:HIGH {}".format(max(data)))
-        self.dev.write("SOURCE:FREQ {}".format(self.__Hz(1/signal_width)))
+        self.dev.write("SOURce{}:FUNC:SHAPE EMEM1".format(ch))
+        self.dev.write("SOURce{}:VOLTage:LEVel:IMMediate:LOW {}".format(ch,min(data)))
+        self.dev.write("SOURce{}:VOLTage:LEVel:IMMediate:HIGH {}".format(ch,max(data)))
+        self.dev.write("SOURce{}:FREQ {}".format(ch, self.__Hz(1/signal_width)))
 
     def ext_trig(self):
         self.dev.write("TRIGger:SEQuence:SOURce EXTernal")
     
-    def burst(self, mode, cycles):
+    def burst(self, ch, mode, cycles):
         """
         Description: Allows on to use burst functionallity
 
@@ -944,11 +944,11 @@ class tektronix_AFG3000:
         Output: 
         """
         modes = ['TRIG','GAT']
-        self.dev.write("SOURCE:BURSt:MODE {}".format(modes[mode]))
-        self.dev.write("SOURCE:BURSt:NCYC {}".format(cycles))
-        self.dev.write("SOURCE:BURSt:STAT ON")
+        self.dev.write("SOURCE{}:BURSt:MODE {}".format(ch,modes[mode]))
+        self.dev.write("SOURCE{}:BURSt:NCYC {}".format(ch,cycles))
+        self.dev.write("SOURCE{}:BURSt:STAT ON".format(ch))
     
-    def DC(self, offset):
+    def DC(self, ch, offset):
         """
         Description: Enables DC Mode (Tested 04/03/2022)
 
@@ -957,10 +957,8 @@ class tektronix_AFG3000:
 
         Output: None : class method
         """
-        self.dev.write("SOUR:FUNC:SHAP DC")
-        self.dev.write("SOUR:VOLT:LEV:IMM:OFFS {}".format(offset))
-        
-        
+        self.dev.write("SOUR{}:FUNC:SHAP DC".format(ch))
+        self.dev.write("SOUR{}:VOLT:LEV:IMM:OFFS {}".format(ch,offset))
 
 #================================================================
 # Rigol DP8000 Series DC Power Supply

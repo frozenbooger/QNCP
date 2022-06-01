@@ -265,6 +265,24 @@ class Rigol_DS1000z:
         
     def channel_state(self, ch, state):
         self.dev.write(':CHANnel{}:DISPlay {}'.format(ch,state))
+        
+    def trigger_set(self, ch, edge, level):
+        """ 
+        Description: Set trigger settings and level
+
+        Input: ch : channel : int = {1,2,3,4}
+               edge : edge to trigger on : int = {'POS'=1, 'NEG'=2, 'RFAL'=3}
+               level : level to trigger at : float 
+        Output: None : None 
+
+        Example: 
+        >>stochastic_search()
+
+        """
+        edges = ['POS','NEG','RFAL']
+        self.dev.write(':TRIGger:EDGE:SOURce CHANnel{}'.format(ch))
+        self.dev.write(':TRIGger:EDGE:SLOPe {}'.format(edges[edge]))
+        self.dev.write(':TRIGger:EDGE:LEVel {}'.format(level))
 
 #===========================================================================
 # Oscilloscope - Rigol DMO5000
@@ -344,6 +362,24 @@ class Rigol_DMO5000:
         
     def channel_state(self, ch, state):
         self.dev.write(':CHANnel{}:DISPlay {}'.format(ch,state))
+        
+    def trigger_set(self, ch, edge, level):
+        """ 
+        Description: Set trigger settings and level
+
+        Input: ch : channel : int = {1,2,3,4}
+               edge : edge to trigger on : int = {'POS'=1, 'NEG'=2, 'RFAL'=3}
+               level : level to trigger at : float 
+        Output: None : None 
+
+        Example: 
+        >>stochastic_search()
+
+        """
+        edges = ['POS','NEG','RFAL']
+        self.dev.write(':TRIGger:EDGE:SOURce CHANnel{}'.format(ch))
+        self.dev.write(':TRIGger:EDGE:SLOPe {}'.format(edges[edge]))
+        self.dev.write(':TRIGger:EDGE:LEVel {}'.format(level))
     
 #===========================================================================
 # Polarimeter - Thorlabs PAX1000

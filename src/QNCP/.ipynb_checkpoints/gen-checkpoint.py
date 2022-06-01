@@ -157,6 +157,13 @@ class Rigol_DG4000:
                 return 1*float(re.sub('[a-zA-Z]','',f))
         else: # float, or str that contains only numbers
             return float(f)*1e6
+        
+    def output_impedence(self, ch, *load):
+        if bool(load) == False:
+            load = 'INF'
+        else:
+            load = load[0]
+        self.dev.write(':OUTPut{}:LOAD {}'.format(ch,load))
 
     def freq(self,ch,*f):
         if bool(f) == True:   # assign value (only the first in the tuple)
@@ -194,10 +201,10 @@ class Rigol_DG4000:
             return __lev, __unit
 
     def offset(self,ch,offset):  # V_DC
-        self.dev.write(':SOURCe{}:VOLTage:OFFSet {}'.format(ch,offset));
+        self.dev.write(':SOURCe{}:VOLTage:OFFSet {}'.format(ch,offset))
 
-    def phase(self,ch,p):
-        self.dev.write(':SOURCe{}:PHASe {}'.format(ch,p));
+    def phase(self,ch,phase):
+        self.dev.write(':SOURCe{}:PHASe {}'.format(ch,phase))
         
     @staticmethod    
     def gaussian(t,mu,FWHM,a): #Gaussian Function. Inputs: (FWHM, Amplitude, Center)
@@ -237,17 +244,21 @@ class Rigol_DG4000:
         if inspect.ismethod(waveform) == True or inspect.isfunction(waveform) == True:
             t = np.linspace(0,signal_width,buffer_size)
             data = waveform(t,*arg)
-            datastring = ",".join(map(str,np.round(self.normalize(data),4)))
+            midpoint = (max(data)-min(data))/2
+            centered_data = data - midpoint
+            datastring = ",".join(map(str,np.round(self.normalize(centered_data),4)))
         else:
             data = waveform
-            datastring = ",".join(map(str,np.round(self.normalize(data),4)))
-        
-        factor = max([np.abs(max(data)),np.abs(min(data))])
+            midpoint = (max(data)-min(data))/2
+            centered_data = data - midpoint
+            datastring = ",".join(map(str,np.round(self.normalize(centered_data),4)))
+    
         self.dev.write('SOURCE{}:Freq {}'.format(ch, 1/signal_width))
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch) + datastring)
         self.dev.write("SOURCE{}:FUNC VOLATILE,".format(ch))
-        self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,-factor))
-        self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,factor))
+        self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(centered_data)))
+        self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(centered_data)))
+        self.dev.write('SOURCe{}:VOLTage:OFFSet {}'.format(ch,midpoint))
         self.dev.write("SOURCE{}:PHASE:SYNC".format(ch))
     
     def burst(self, ch, mode, cycles):

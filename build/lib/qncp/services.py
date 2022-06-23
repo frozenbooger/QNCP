@@ -12,6 +12,7 @@ from scipy.optimize import basinhopping
 from scipy.optimize import curve_fit
 import re
 import os
+import requests 
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -404,3 +405,91 @@ class AM_characterization:
         """
         self.estimate_max_min()
         self.gen.DC(self.gench, self.v_max)
+
+class qrng:
+    def __init__(self,address):
+        """ 
+        Description: initializes session with QRNG given IP address
+
+        Input: ip address : string
+        Output: None
+        Example: 
+        >> qrng('10.1.2.80')
+        
+        """
+        self.address = 'https://' + address
+        
+    def get_numbers(self, num_type_set, minimum, maximum, quantity):
+        """ 
+        Description: gets random numbers of different types
+
+        Input: num_type_set : int = {0='int',1='short',2='float',3='double'}
+        Output: List of random numbers : list of floats
+        Example: 
+        >> qrng1.get_numbers(1,0,5,20) #returns 10 integers between 0 and 100
+        
+        """
+        num_types = ['int','short','float','double']
+        num_type = num_types[num_type_set]
+        command_num = '/api/2.0/{}?min={}&max={}&quantity={}'.format(num_type,minimum,maximum,quantity) 
+        response = requests.get(self.address+command_num,verify=False)
+        code = response.text
+        refined_code = code.strip('][').split(',')
+        refined_code = list(map(float,refined_code))
+        return refined_code
+    
+    def get_bytes(self, size, *quantity):
+        """ 
+        Description: Still in working on this
+
+        Input: Still in working on this
+        Output: Still in working on this
+        Example: Still in working on this
+        >> 
+        
+        """
+        try:
+            if bool(quantity) == True:
+                command_bytes = '/api/2.0/hexbytes?DataLength={}&quantity={}'.format(size,quantity) 
+            else:
+                command_bytes = '/api/2.0/streambytes?size={}'.format(size)  
+            response = requests.get(self.address+command_bytes,verify=False)
+            code = response.text
+            refined_code = code.strip('][').split(',')
+            refined_code = list(map(float,refined_code))
+            return refined_code
+        except:
+            raise ValueError('Function is under construction')
+    
+    def get_performance(self):
+        """ 
+        Description: gets performance in terms of qrn generation rate
+
+        Input: None
+        Output: None
+        Example: get_performance()
+        >> get_performance()
+        
+        """
+        command_performance = '/api/2.0/performance'
+        response = requests.get(self.address+command_performance,verify=False)
+        code = response.text
+        return code+'Mbps'
+    
+    def get_info(self):
+        """ 
+        Description: gets software and firmware editions and info
+
+        Input: None
+        Output: None
+        Example: get_info()
+        >> get_info()
+        
+        """
+        command_firmware = '/api/2.0/firmwareinfo'
+        response_firmware = requests.get(self.address+command_firmware,verify=False)
+        command_software = '/api/2.0/softwareinfo'
+        response_software = requests.get(self.address+command_software,verify=False)
+        firmware = response_firmware.text
+        software = response_software.text
+        return firmware+'\n'+software

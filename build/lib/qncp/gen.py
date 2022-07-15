@@ -193,13 +193,37 @@ class Rigol_DG4000:
 
     def freq(self,ch,*f):
         if bool(f) == True:   # assign value (only the first in the tuple)
-            __freq = f[0]
-            self.dev.write(':SOURCe{}:Freq {}'.format(ch,self.__Hz(__freq)));
+            freq = self.__Hz(f[0])
+            try:
+                freq_apply = min(freq,  eval('self.hz_max_{}'.format(ch)))
+            except:
+                freq_apply = freq
+            self.dev.write(':SOURCe{}:Freq {}'.format(ch, freq_apply));
+            if freq_apply < freq:
+                print('Warning: channel {} output frequency is too high. Reduced to {} Hz'.
+                      format(ch,eval('self.hz_max_{}'.format(ch))))
         else:   # when no input is entered, read actual frequency 
             __readOut = self.dev.query(':SOURCe{}:Freq?'.format(ch))
             __freq = float(re.search('.*(?=\n)',__readOut).group())
             return float(__freq)*1e-6  # MHz
         
+    def freq_max(self, ch, *f):
+        """
+        Setup the frequency limit.
+        
+        Input: channel, frequency max (any unit)
+        
+        Output: maximum frequency (Hz)
+        """
+        if bool(f):
+            hz_max = f[0]
+            exec("self.hz_max_{} = {} ".format(ch, self.__Hz(hz_max)))
+        else:
+            try:
+                return eval("self.hz_max_{}".format(ch))   # 'Hz'
+            except:
+                print('Warning: maximum output frequency has not been specified yet.' )
+                    
     def lev(self,ch,*v):
         if bool(v) == True:
             __v = v[0]

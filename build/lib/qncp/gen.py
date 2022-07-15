@@ -166,9 +166,9 @@ class Rigol_DG4000:
             self.dev.write(':OUTput1 ON') 
             self.dev.write(':OUTput2 ON')
 
-    def __Hz(f):  # in Hz, support unit. Default: MHz
+    def __Hz(self, f):  # in Hz, support unit. Default: MHz
         """
-        Description: Sets all frequencies to MHz Unit (Tested 04/03/2022)
+        Description: Sets all frequencies to MHz Unit (Tested 07/15/2022)
 
         Input: f : frequency : float
 

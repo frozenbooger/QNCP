@@ -116,6 +116,32 @@ class Rigol_DSG800:
 #================================================================
 # Function Generator - Rigol DG4000 series
 #================================================================
+def power_vrms(v,z):
+    """
+    Calculate power using Vrms
+    Input: Vrms, impedance Z
+    Output: power (W)
+    """
+    return v**2/z
+
+def power_vpp(v,z):
+    """
+    Calculate power using Vpp
+    Input: Vpp, impedance Z
+    Output: power (W)
+    
+    """
+    return v**2/z/8
+
+def power_dbm(dbm):
+    """
+    Convert power from dBm to W
+    Input: dBm
+    Output: power (W)
+    
+    """
+    return pow(10, -3 + dbm/10)
+
 class Rigol_DG4000:
     def __init__(self,address):
         self.address = address
@@ -179,27 +205,92 @@ class Rigol_DG4000:
             __v = v[0]
             if type(__v) == str:
                 __lev = float(re.sub('[a-zA-Z]','',__v))  # unitless value
-                if re.search('(vrms)',__v,re.IGNORECASE) != None:  #  VRMS
-                    self.dev.write(':SOURCe{}:VOLTage:UNIT VRMS'.format(ch))
-                elif re.search('d',__v,re.IGNORECASE) != None:  # dBm
-                    self.dev.write(':SOURCe{}:VOLTage:UNIT DBM'.format(ch))
-                else:  # VPP
-                    self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
                 # mVPP or mVRMS
                 if re.search('(mv)',__v,re.IGNORECASE) != None:
                     __lev = 1e-3 * __lev
-                # value
-                self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,__lev))
+                # apply voltage 
+                if re.search('(vrms)',__v,re.IGNORECASE) != None:  #  VRMS
+                    self.dev.write(':SOURCe{}:VOLTage:UNIT VRMS'.format(ch))
+                    try:
+                        lev_apply = min(__lev, eval('self.vpp_max_{}/2/pow(2,1/2)'.format(ch)) )
+                    except:
+                        lev_apply = __lev
+                elif re.search('(dbm)',__v,re.IGNORECASE) != None:  # dBm
+                    self.dev.write(':SOURCe{}:VOLTage:UNIT DBM'.format(ch))
+                    try:
+                        lev_apply = min(__lev, eval('10*np.log10(1000*self.power_max_{})'.format(ch)) )
+                    except:
+                        lev_apply = __lev
+                elif re.search('(vpp)',__v,re.IGNORECASE) != None:  # VPP
+                    self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
+                    try:
+                        lev_apply = min(__lev, eval('self.vpp_max_{}'.format(ch)) )
+                    except:
+                        lev_apply = __lev
+                self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,lev_apply))
             else:  # default: [Vpp] 
+                __lev = __v
+                try:
+                    lev_apply = min(__lev, eval('self.vpp_max_{}'.format(ch)) )
+                except:
+                    lev_apply = __lev
                 self.dev.write(':SOURCe{}:VOLTage:UNIT VPP'.format(ch))
-                self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,__v))
+                self.dev.write(':SOURCe{}:VOLTage {}'.format(ch,lev_apply))
+            # print out warning
+            if lev_apply < __lev:
+                print('Protection Warning: output {} amplitude is too high. Reduced to limit value.'.format(ch))
         else:
             __readOut = self.dev.query(':SOURCe{}:VOLTage?'.format(ch))
             __lev = float(re.search('.*(?=\n)',__readOut).group())
             __readOut = self.dev.query(':SOURCe{}:VOLTage:UNIT?'.format(ch))
             __unit = re.search('.*(?=\n)',__readOut).group()
             return __lev, __unit
-
+        
+    def lev_max(self,ch, *v):
+        """
+        Set maximum output level, in any units.
+        * Note that Vrms - Vpp conversion only holds for sinusoidal wave!
+        Input: channel, maximum voltage/power.
+        
+        Output: maximum amplitude, (and maximum power if imepance is not inf).
+        """
+        z_string = self.dev.query(':OUTPut{}:LOAD?'.format(ch))
+        z = float(re.search('.*(?=\n)',z_string).group())
+        # assign max voltage
+        if bool(v) == True:  
+            __v = v[0]
+            if type(__v) == str:  # with unit
+                lev = float(re.sub('[a-zA-Z]','',__v))  # unitless value
+                if re.search('(vrms)',__v,re.IGNORECASE) != None:  #  VRMS
+                    exec("self.vpp_max_{} = lev * 2 * pow(2, 1/2) ".format(ch))
+                    if z != np.inf:
+                        exec("self.power_max_{} = power_vrms(lev,z)".format(ch))
+                elif re.search('(vpp)',__v,re.IGNORECASE) != None:  # Vpp
+                    exec("self.vpp_max_{} = lev".format(ch))
+                    if z != np.inf:
+                        exec("self.power_max_{} = power_vpp(lev,z)".format(ch))
+                elif (re.search('(dbm)',__v,re.IGNORECASE) != None):  # dbm
+                    exec("self.power_max_{} = power_dbm(lev)".format(ch))   # W
+                    if  (z != np.inf):
+                        exec("self.vpp_max_{} = 2*pow(2,1/2)*pow(self.power_max_{} * z, 1/2)"
+                             .format(ch,ch))
+                # mVPP or mVRMS
+                if re.search('(mv)',__v,re.IGNORECASE) != None:
+                    exec("self.vpp_max_{} = 1e-3 * self.vpp_max_{}".format(ch,ch))
+                    exec("self.power_max_{} = 1e-6 * self.power_max_{}".format(ch,ch))
+            else:  # default: [Vpp] 
+                exec("self.vpp_max_{} = v[0]".format(ch))
+                exec("self.power_max_{} = power_vpp(v[0],z)".format(ch))
+        else:  # read self.power_max
+            try:
+                return eval("self.vpp_max_{}".format(ch))   # 'Vpp'
+            except:
+                try:
+                    if bool(eval("self.power_max_{}".format(ch))) == True:
+                        print('Warning: maximum output voltage cannot be specified because of infinite impedance.' )
+                except:
+                    print('Warning: maximum output level has not been specified yet.' )
+        
     def offset(self,ch,offset):  # V_DC
         self.dev.write(':SOURCe{}:VOLTage:OFFSet {}'.format(ch,offset))
 
@@ -328,7 +419,6 @@ class Rigol_DG4000:
         self.dev.write("SOURCE{}:BURST:NCYC {}".format(ch,cycles))
         self.dev.write("SOURCE{}:BURST:MODE:TRIG".format(ch))
         self.ext_trig(ch)
-
         
         
 #===========================================================================

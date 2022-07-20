@@ -473,9 +473,9 @@ class thorlabs_polarimeter:
         chi = float(data[10])
         dop= float(data[11])
         power = float(data[12])
-        s1 = np.cos(2 * psi) * np.cos(2 * chi)
-        s2 = np.sin(2 * psi) * np.cos(2 * chi)
-        s3 = np.sin(2 * chi)
+        s1 = power * dop * np.cos(2 * psi) * np.cos(2 * chi)
+        s2 = power * dop * np.sin(2 * psi) * np.cos(2 * chi)
+        s3 = power * dop * np.sin(2 * chi)
         return s1, s2, s3, dop, power
 
     def get_raw_data(self):
@@ -499,4 +499,7 @@ class thorlabs_polarimeter:
         time.sleep(1)
         self.dev = self.rm.open_resource(self.address)
         self.dev.write('*RST')
+    
+    def set_power_range(self, ind):
+        self.dev.write('SENS:POW:RANG:IND {}'.format(ind))
         

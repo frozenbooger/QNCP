@@ -4,9 +4,9 @@ This is used to find a near-optiminal poles for on a great circle for the Lithiu
 by EOSPace. See: https://www.eospace.com/polarization-controller.
 
 There are several steps involved.
-1) The characterization of the crystal. Voltages are swept through the crystal and the output polarization is measured.
-2) Fitting a model to the crystal. Machine learning is used to fit a model to interpolate the polarization between the voltages used to characterize the great circle. This step can be used to improve the fit, but may optionally be omitted.
-3) Finding near-optiminal poles on a great circle. The measured polarizations coupled with the interpolated polarizations are used to find four poles (north, south, east, west) on the great circle. The poles and the voltages required to produce those poles are reported.
+1) The characterization of the crystal. Voltages are swept through the crystal and the output polarization is measured. The function `characterize_crystal` provides this functionality.
+2) Fitting a model to the crystal. Machine learning is used to fit a model to interpolate the polarization between the voltages used to characterize the great circle. This step can be used to improve the fit, but may optionally be omitted. The function `fit_crystal_model` provides this functionality.
+3) Finding near-optiminal poles on a great circle. The measured polarizations coupled with the interpolated polarizations are used to find four poles (north, south, east, west) on the great circle. The poles and the voltages required to produce those poles are reported. The function `find_poles` provides this functionality.
 """
 import tqdm
 import numpy as np
@@ -56,12 +56,13 @@ def characterize_crystal(
     samples = []
     with tqdm.tqdm(total=polarization_n_samples*v_1_n_samples*v_2_n_samples) as pbar:
         for v_1 in np.linspace(v_1_range[0], v_1_range[1], v_1_n_samples):
-            set_v1(v1)
+            set_v1(v_1)
             for v_2 in np.linspace(v_2_range[0], v_2_range[1], v_2_n_samples):
-                set_v2(v2)
+                set_v2(v_2)
                 for i in range(polarization_n_samples):
                     s = measure_polarization()
-                    samples.append((v_a, v_b) + s)
+                    samples.append((v_1, v_2) + s)
+                    pbar.update(1)
 
     samples = np.stack(samples, axis=0)
     return samples
@@ -276,44 +277,30 @@ def find_poles(
     points_circ = np.expand_dims(u_circ, -1)*np.cos(t_circ) + np.expand_dims(w_circ, -1)*np.sin(t_circ)
     points_circ = points_circ[0].T
 
-    # Our initial set of points will determine the 4 points that we will explore as our
-    # starting point on the great circle
-    circle_neighbors = NearestNeighbors(n_neighbors=1).fit(points_circ)
-    best_distances, best_indices = circle_neighbors.kneighbors(initial_s)
-    best_distances = best_distances[:, 0]
-    best_indices = best_indices[:, 0]
-    best_points = points_circ[best_indices[np.argsort(best_distances)]]
-
-    min_distance = np.inf
-    poles_with_min_distance = None
-    min_interpolated_indices = None
-    min_interpolated_distances = None
-
     interpolated_neighbors = NearestNeighbors(n_neighbors=1).fit(s_eval)
-    for i in range(best_points.shape[0]):
-        point_gen_index = np.argmin(np.abs(np.einsum('j,ij->i', best_points[i], best_points)))
-        u_pole = best_points[i]
-        v_pole = best_points[point_gen_index]
-        assert point_gen_index != i
+    #point_gen_indices = np.argmin(np.abs(np.einsum('ik,jk->ij', points_circ[i], best_points)), axis=-1)
+    u_pole = points_circ
+    v_pole = np.expand_dims(u_circ, -1)*np.cos(t_circ + np.pi/2) + np.expand_dims(w_circ, -1)*np.sin(t_circ + np.pi/2)
+    v_pole = v_pole[0].T
+    t_pole = np.arange(4)*2*np.pi/4
+    w_pole = np.cross(np.cross(u_pole, v_pole), u_pole)
+    poles = np.expand_dims(u_pole, -1)*np.cos(t_pole) + np.expand_dims(w_pole, -1)*np.sin(t_pole)
+    poles = np.transpose(poles, (0, 2, 1))
+    t1, t2, t3 = poles.shape
 
-        u_pole = np.expand_dims(u_pole, 0)
-        v_pole = np.expand_dims(v_pole, 0)
-        t_pole = np.arange(4)*2*np.pi/4
-        w_pole = np.cross(np.cross(u_pole, v_pole), u_pole)
-        poles = np.expand_dims(u_pole, -1)*np.cos(t_pole) + np.expand_dims(w_pole, -1)*np.sin(t_pole)
-        poles = poles[0].T
+    poles = poles.reshape((t1*t2, t3))
+    distances, indices = interpolated_neighbors.kneighbors(poles)
+    distances = distances.reshape((t1, t2))
+    indices = indices.reshape((t1, t2))
+    distances = np.sum(distances, axis=-1)
+    min_distance = np.argmin(distances)
+    poles = poles.reshape((t1, t2, t3))
 
-        interpolated_distances, interpolated_indices = interpolated_neighbors.kneighbors(poles)
-        interpolated_distances = interpolated_distances[:, 0]
-        interpolated_indices = interpolated_indices[:, 0]
-        if np.sum(interpolated_distances) < min_distance:
-            min_distance = np.sum(interpolated_distances)
-            poles_with_min_distance = poles
-            min_interpolated_indices = interpolated_indices
-            min_interpolated_distances = interpolated_distances
-            
+    best_s = s_eval[indices[min_distance]]
+    best_voltages = voltages_eval[indices[min_distance]]
+    best_distance = distances[min_distance]
 
-    if min_distance < initial_distance:
-        return s_eval[min_interpolated_indices], voltages_eval[min_interpolated_indices], min_distance
+    if best_distance < initial_distance:
+        return best_s, best_voltages, best_distance
     else:
         return initial_s, initial_voltages, initial_distance

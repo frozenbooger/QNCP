@@ -7,6 +7,10 @@ PyVISA
 PyVISA-py
 regex
 scipy
+scikit-learn
 scp
 visa
 python-vxi11
+
+[crystal fitting]
+torch>=1.8

@@ -1,3 +1,5 @@
+import sys
+sys.path.append('/dependencies')
 import redpitaya_scpi as scpi
 
 class red_pitaya:

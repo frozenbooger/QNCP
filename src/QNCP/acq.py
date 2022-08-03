@@ -1,7 +1,7 @@
 import pyvisa
 from pyvisa.constants import Parity,StopBits
 import ctypes
-import os, sys
+import os, sys, pathlib
 from sys import platform
 import numpy as np
 import matplotlib.pyplot as plt
@@ -544,8 +544,11 @@ class qutag:
         
         if platform != 'win32':
             raise ValueError('this device is not compatible with your operating system')
-            
-        file_path = os.path.dirname(os.path.abspath('dependencies/tdcbase_64bit.dll'))
+        
+        package_path = Path(pathlib.Path(sys.path[-2]).parents[1])
+        dep_path = Path(os.path.join('QNCP', 'dependencies', 'tdcbase_64bit.dll'))
+        file_path = package_path / dep_path.relative_to(dep_path.anchor)
+        print(file_path)
         # check Python bit version
         if sys.maxsize > 2**32:
             # load DLL 64 Bit -------------------------------------------

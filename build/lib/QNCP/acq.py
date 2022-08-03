@@ -547,8 +547,7 @@ class qutag:
         
         package_path = pathlib.Path(pathlib.Path(sys.path[-2]).parents[1])
         dep_path = pathlib.Path(os.path.join('QNCP', 'dependencies', 'tdcbase_64bit.dll'))
-        file_path = package_path / dep_path.relative_to(dep_path.anchor)
-        print(file_path)
+        file_path = str(package_path / dep_path.relative_to(dep_path.anchor))
         # check Python bit version
         if sys.maxsize > 2**32:
             # load DLL 64 Bit -------------------------------------------

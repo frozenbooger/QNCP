@@ -17,3 +17,4 @@ src/qncp/redpitaya.py
 src/qncp/search.py
 src/qncp/services.py
 src/qncp/storage.py
+src/qncp/dependencies/tdcbase_64bit.dll

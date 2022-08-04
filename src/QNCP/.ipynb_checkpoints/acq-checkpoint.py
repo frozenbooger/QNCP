@@ -546,7 +546,7 @@ class qutag:
             raise ValueError('this device is not compatible with your operating system')
         
         package_path = pathlib.Path(pathlib.Path(sys.path[-2]).parents[1])
-        dep_path = pathlib.Path(os.path.join('QNCP', 'dependencies', 'tdcbase_64bit.dll'))
+        dep_path = pathlib.Path(os.path.join('qncp', 'tdcbase_64bit.dll'))
         file_path = str(package_path / dep_path.relative_to(dep_path.anchor))
         # check Python bit version
         if sys.maxsize > 2**32:

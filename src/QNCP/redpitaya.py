@@ -133,7 +133,7 @@ class scpi (object):
 class red_pitaya(scpi):
     def __init__(self,address):
         self.address = address
-        self.rp_s = scpi.scpi(self.address)
+        self.rp_s = scpi(self.address)
         
     def set_pin(self, pin : str, direction : bool, *state : bool):
         """

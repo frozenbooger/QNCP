@@ -538,7 +538,7 @@ class qutag:
         Checking the bit version of Python to load the corresponding DLL \n
         Loading 32 or 64 bit DLL: make sure the wrapper finds the matching DLL in the same folder  \n
         Declary API  \n
-        Connect the device by the function QuTAG.Initialize()  \n
+        Connect the device by the function self.Initialize()  \n
         Set some parameters
         """
         
@@ -546,7 +546,7 @@ class qutag:
             raise ValueError('this device is not compatible with your operating system')
         
         package_path = pathlib.Path(pathlib.Path(sys.path[-2]).parents[4])
-        dep_path = pathlib.Path(os.path.join('QNCP'))
+        dep_path = pathlib.Path(os.path.join('QNCP','dlls'))
         file_path = str(package_path / dep_path.relative_to(dep_path.anchor))
         # check Python bit version
         if sys.maxsize > 2**32:
@@ -596,7 +596,7 @@ class qutag:
         else:
                 print("No suitable device found - demo mode activated")
         
-        print("Initialized with QuTAG DLL v%f"%(self.getVersion()))
+        print("Initialized with self DLL v%f"%(self.getVersion()))
 
     def declareAPI(self):
         """Declare the API of the DLL with its functions and dictionaries. Should not be executed from the user."""
@@ -822,23 +822,23 @@ class qutag:
         self.qutools_dll.TDC_getHbtEventCount.restype = ctypes.c_int32
         self.qutools_dll.TDC_getHbtIntegrationTime.argtypes = [ctypes.POINTER(ctypes.c_double)]
         self.qutools_dll.TDC_getHbtIntegrationTime.restype = ctypes.c_int32
-        self.qutools_dll.TDC_getHbtCorrelations.argtypes = [ctypes.c_int32, ctypes.POINTER(QuTAG.TDC_HbtFunction)]
+        self.qutools_dll.TDC_getHbtCorrelations.argtypes = [ctypes.c_int32, ctypes.POINTER(self.TDC_HbtFunction)]
         self.qutools_dll.TDC_getHbtCorrelations.restype = ctypes.c_int32
-        self.qutools_dll.TDC_calcHbtG2.argtypes = [ctypes.POINTER(QuTAG.TDC_HbtFunction)]
+        self.qutools_dll.TDC_calcHbtG2.argtypes = [ctypes.POINTER(self.TDC_HbtFunction)]
         self.qutools_dll.TDC_calcHbtG2.restype = ctypes.c_int32
-        self.qutools_dll.TDC_fitHbtG2.argtypes = [ctypes.POINTER(QuTAG.TDC_HbtFunction),ctypes.c_int32,ctypes.POINTER(ctypes.c_double),ctypes.POINTER(ctypes.c_double),ctypes.POINTER(ctypes.c_int32)]
+        self.qutools_dll.TDC_fitHbtG2.argtypes = [ctypes.POINTER(self.TDC_HbtFunction),ctypes.c_int32,ctypes.POINTER(ctypes.c_double),ctypes.POINTER(ctypes.c_double),ctypes.POINTER(ctypes.c_int32)]
         self.qutools_dll.TDC_fitHbtG2.restype = ctypes.c_int32
         self.qutools_dll.TDC_getHbtFitStartParams.argtypes = [ctypes.c_int32,ctypes.POINTER(ctypes.c_double)]
         self.qutools_dll.TDC_getHbtFitStartParams.restype = ctypes.POINTER(ctypes.c_double)
-        self.qutools_dll.TDC_calcHbtModelFct.argtypes = [ctypes.c_int32,ctypes.POINTER(ctypes.c_double),ctypes.POINTER(QuTAG.TDC_HbtFunction)]
+        self.qutools_dll.TDC_calcHbtModelFct.argtypes = [ctypes.c_int32,ctypes.POINTER(ctypes.c_double),ctypes.POINTER(self.TDC_HbtFunction)]
         self.qutools_dll.TDC_calcHbtModelFct.restype = ctypes.c_int32
         self.qutools_dll.TDC_generateHbtDemo.argtypes = [ctypes.c_int32,ctypes.POINTER(ctypes.c_double),ctypes.c_double]
         self.qutools_dll.TDC_generateHbtDemo.restype = ctypes.c_int32
         self.qutools_dll.TDC_createHbtFunction.argtypes = None
-        self.qutools_dll.TDC_createHbtFunction.restype = ctypes.POINTER(QuTAG.TDC_HbtFunction)
-        self.qutools_dll.TDC_releaseHbtFunction.argtypes = [ctypes.POINTER(QuTAG.TDC_HbtFunction)]
+        self.qutools_dll.TDC_createHbtFunction.restype = ctypes.POINTER(self.TDC_HbtFunction)
+        self.qutools_dll.TDC_releaseHbtFunction.argtypes = [ctypes.POINTER(self.TDC_HbtFunction)]
         self.qutools_dll.TDC_releaseHbtFunction.restype = None
-        self.qutools_dll.TDC_analyseHbtFunction.argtypes = [ctypes.POINTER(QuTAG.TDC_HbtFunction),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_double),ctypes.c_int32]
+        self.qutools_dll.TDC_analyseHbtFunction.argtypes = [ctypes.POINTER(self.TDC_HbtFunction),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_double),ctypes.c_int32]
         self.qutools_dll.TDC_analyseHbtFunction.restype = ctypes.c_int32
         
         # ------- tdclifetm.h --------------------------------------------------------
@@ -870,14 +870,14 @@ class qutag:
         self.qutools_dll.TDC_resetLftHistograms.argtypes = None
         self.qutools_dll.TDC_resetLftHistograms.restype = ctypes.c_int32
         self.qutools_dll.TDC_createLftFunction.argtypes = None
-        self.qutools_dll.TDC_createLftFunction.restype = ctypes.POINTER(QuTAG.TDC_LftFunction)
-        self.qutools_dll.TDC_releaseLftFunction.argtypes = [ctypes.POINTER(QuTAG.TDC_LftFunction)]
+        self.qutools_dll.TDC_createLftFunction.restype = ctypes.POINTER(self.TDC_LftFunction)
+        self.qutools_dll.TDC_releaseLftFunction.argtypes = [ctypes.POINTER(self.TDC_LftFunction)]
         self.qutools_dll.TDC_releaseLftFunction.restype = None
-        self.qutools_dll.TDC_analyseLftFunction.argtypes = [ctypes.POINTER(QuTAG.TDC_LftFunction),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_double),ctypes.c_int32]
+        self.qutools_dll.TDC_analyseLftFunction.argtypes = [ctypes.POINTER(self.TDC_LftFunction),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_double),ctypes.c_int32]
         self.qutools_dll.TDC_analyseLftFunction.restype = None
-        self.qutools_dll.TDC_getLftHistogram.argtypes = [ctypes.c_int32,ctypes.c_int32,ctypes.POINTER(QuTAG.TDC_LftFunction),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int64)]
+        self.qutools_dll.TDC_getLftHistogram.argtypes = [ctypes.c_int32,ctypes.c_int32,ctypes.POINTER(self.TDC_LftFunction),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int32),ctypes.POINTER(ctypes.c_int64)]
         self.qutools_dll.TDC_getLftHistogram.restype = ctypes.c_int32
-        self.qutools_dll.TDC_calcLftModelFct.argtypes = [ctypes.c_int32,ctypes.POINTER(ctypes.c_double),ctypes.POINTER(QuTAG.TDC_LftFunction)]
+        self.qutools_dll.TDC_calcLftModelFct.argtypes = [ctypes.c_int32,ctypes.POINTER(ctypes.c_double),ctypes.POINTER(self.TDC_LftFunction)]
         self.qutools_dll.TDC_calcLftModelFct.restype = ctypes.c_int32
         self.qutools_dll.TDC_generateLftDemo.argtypes = [ctypes.c_int32,ctypes.POINTER(ctypes.c_double),ctypes.c_double]
         self.qutools_dll.TDC_generateLftDemo.restype = ctypes.c_int32

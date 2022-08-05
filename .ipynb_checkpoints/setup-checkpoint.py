@@ -3,7 +3,7 @@ import os, sys, pathlib
 
 setup(
     name='QNCP',
-    version='1.10.2.6',#first: when we get to 10 on second, second: new devices, new package-req., new-functions, three: bugs, four: minor bugs
+    version='1.10.2.7',#first: when we get to 10 on second, second: new devices, new package-req., new-functions, three: bugs, four: minor bugs
     license='MIT',
     author="Leonardo Castillo Veneros and Guodong Cui",
     author_email='frozenbooger@gmail.com',
@@ -28,6 +28,6 @@ setup(
     extras_require = {
         'crystal fitting':  ["torch>=1.8"]},
     package_data={os.path.join('src','qncp'):['*.dll','qncp/dependencies/*']},
-    data_files = [('',[os.path.join('src','qncp','dependencies','tdcbase_64bit.dll')])],
+    data_files = [('dlls',[os.path.join('src','qncp','dependencies','tdcbase_64bit.dll'),os.path.join('src','qncp','dependencies','FTD3XX.dll'),os.path.join('src','qncp','dependencies','libusb0.dll')])],
     zip_safe=False
 )

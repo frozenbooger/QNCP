@@ -322,7 +322,7 @@ class Rigol_DG4000:
         self.dev.write(':SOURCe{}:PHASe {}'.format(ch,phase))
         
     @staticmethod    
-    def gaussian(t,mu,FWHM,a): #Gaussian Function. Inputs: (FWHM, Amplitude, Center)
+    def gaussian(t,mu,FWHM,a): 
         sigma = (FWHM)/(2*np.sqrt(2*np.log(2)))
         amplitude = np.sqrt(2*np.pi*sigma**2)*a
         return amplitude*( 1/(sigma * np.sqrt(2*np.pi) ) )*np.exp( -((t-mu)**2 / (2*sigma**2)) )

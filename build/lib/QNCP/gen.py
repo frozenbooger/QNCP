@@ -8,6 +8,22 @@ from scipy.signal import find_peaks
 import inspect
 import vxi11
 import time
+
+def robust(method, *arg):
+    def robust_method(self, *arg):
+        try:
+            method(self,*arg)
+        except:
+            self.dev.close()
+            time.sleep(1)
+            self.dev = self.rm.open_resource(self.address)
+            method(self,*arg)
+        
+    robust_method.__name__ = method.__name__
+    robust_method.__doc__ = method.__doc__
+    robust_method.__module__ = method.__module__
+    return robust_method
+
 #================================================================
 # Valon_5015('Pete' or 'Ringo')
 #================================================================
@@ -18,7 +34,7 @@ class Valon_5015:
         self.dev = self.rm.open_resource(self.address)
         self.dev.read_termination = '-->'
         self.clear()
-   
+    
     def off(self): 
         self.write('OEN OFF;')  # turn off RF output
         self.write('PDN OFF;')  # turn off synth output
@@ -68,6 +84,7 @@ class Valon_5015:
 # Function Generator - Rigol DSG800 series
 #================================================================
 
+@robust
 class Rigol_DSG800:
     
     def __init__(self,address,*arg):
@@ -78,13 +95,16 @@ class Rigol_DSG800:
             self.address = address 
             self.rm = pyvisa.ResourceManager()
             self.dev = self.rm.open_resource(self.address)
-     
+    
+    @robust
     def off(self):
         self.dev.write(':OUTput OFF;')  # turn on RF output
-        
+    
+    @robust    
     def on(self):
         self.dev.write(':OUTput On;')  # turn on RF output
     
+    @robust
     def freq(self,*f):  # MHz
         if bool(f) == True:
             __f = f[0]
@@ -99,7 +119,8 @@ class Rigol_DSG800:
             __readOut = self.dev.query(':Freq?')
             __freq = float(re.search('.*(?=\n)',__readOut).group())*1e-6
             return __freq
-            
+    
+    @robust        
     def lev(self,*l):  # MHz
         if bool(l) == True:
             __l = l[0]
@@ -147,10 +168,12 @@ class Rigol_DG4000:
         self.address = address
         self.rm = pyvisa.ResourceManager()
         self.dev = self.rm.open_resource(self.address)
-        
+    
+    @robust
     def reset(self): #Reset
         self.dev.write("*RST")
-        
+    
+    @robust
     def off(self,*ch):  # default: both
         if bool(ch) == True: # turn single output off
             for channel in ch:
@@ -158,6 +181,7 @@ class Rigol_DG4000:
         else:  # turn both off
             self.dev.write(':OUTput1 OFF') 
             self.dev.write(':OUTput2 OFF')
+    @robust        
     def on(self,*ch): # default: both
         if bool(ch) == True: # turn single output on
             for channel in ch:
@@ -166,7 +190,8 @@ class Rigol_DG4000:
             self.dev.write(':OUTput1 ON') 
             self.dev.write(':OUTput2 ON')
 
-    def __Hz(self, f):  # in Hz, support unit. Default: MHz
+    @staticmethod        
+    def __Hz(self,f):  # in Hz, support unit. Default: MHz
         """
         Description: Sets all frequencies to MHz Unit (Tested 07/15/2022)
 
@@ -183,14 +208,15 @@ class Rigol_DG4000:
                 return 1*float(re.sub('[a-zA-Z]','',f))
         else: # float, or str that contains only numbers
             return float(f)*1e6
-        
+    @robust    
     def output_impedence(self, ch, *load):
         if bool(load) == False:
             load = 'INF'
         else:
             load = load[0]
         self.dev.write(':OUTPut{}:LOAD {}'.format(ch,load))
-
+    
+    @robust
     def freq(self,ch,*f):
         if bool(f) == True:   # assign value (only the first in the tuple)
             freq = self.__Hz(f[0])
@@ -206,7 +232,8 @@ class Rigol_DG4000:
             __readOut = self.dev.query(':SOURCe{}:Freq?'.format(ch))
             __freq = float(re.search('.*(?=\n)',__readOut).group())
             return float(__freq)*1e-6  # MHz
-        
+    
+    @robust
     def freq_max(self, ch, *f):
         """
         Setup the frequency limit.
@@ -223,7 +250,8 @@ class Rigol_DG4000:
                 return eval("self.hz_max_{}".format(ch))   # 'Hz'
             except:
                 print('Warning: maximum output frequency has not been specified yet.' )
-                    
+    
+    @robust
     def lev(self,ch,*v):
         if bool(v) == True:
             __v = v[0]
@@ -269,7 +297,8 @@ class Rigol_DG4000:
             __readOut = self.dev.query(':SOURCe{}:VOLTage:UNIT?'.format(ch))
             __unit = re.search('.*(?=\n)',__readOut).group()
             return __lev, __unit
-        
+    
+    @robust
     def lev_max(self,ch, *v):
         """
         Set maximum output level, in any units.
@@ -314,10 +343,11 @@ class Rigol_DG4000:
                         print('Warning: maximum output voltage cannot be specified because of infinite impedance.' )
                 except:
                     print('Warning: maximum output level has not been specified yet.' )
-        
+    @robust    
     def offset(self,ch,offset):  # V_DC
         self.dev.write(':SOURCe{}:VOLTage:OFFSet {}'.format(ch,offset))
 
+    @robust    
     def phase(self,ch,phase):
         self.dev.write(':SOURCe{}:PHASe {}'.format(ch,phase))
         
@@ -344,6 +374,7 @@ class Rigol_DG4000:
         factor = max([np.abs(max(waveform)),np.abs(min(waveform))])
         return np.array(waveform)/np.absolute(factor)
         
+    @robust
     def arbitrary(self, ch, signal_width, waveform, *arg):
         """
         Description: Allows one to set and create arbitrary waveform output (Tested 05/27/2022) 
@@ -376,7 +407,8 @@ class Rigol_DG4000:
         self.dev.write('SOURCe{}:VOLTage:OFFSet {}'.format(ch,midpoint))
         self.dev.write("SOURCE{}:PHASE:SYNC".format(ch))
     
-    def burst(self, ch, mode, cycles):
+    @robust
+    def burst_mode(self, ch, mode, cycles):
         """
         Description: Allows on to use burst functionallity (Tested 04/03/2022)
 
@@ -392,6 +424,12 @@ class Rigol_DG4000:
         self.dev.write('SOURce{}:BURSt:NCYCles {}'.format(ch,cycles))
         self.dev.write('SOURce{}:BURSt ON'.format(ch))
         
+    @robust
+    def burst_state(self, ch, state):
+        states = ['OFF','ON']
+        self.dev.write('SOURce{}:BURSt {}'.format(ch, states[state]))
+        
+    @robust    
     def DC(self, ch, offset):
         """
         Description: Enables DC Mode (Tested 04/03/2022)
@@ -404,10 +442,12 @@ class Rigol_DG4000:
         self.dev.write("SOURCE{}:FUNC DC".format(ch))
         self.offset(ch,offset)
     
+    @robust
     def ext_trig(self,ch):
         self.dev.write("SOURCE{}:BURST:TRIG:SOUR EXT".format(ch))
         
-    def arbitrary_burst(self,ch,signal_width,cycles,func,*arg):
+    @robust
+    def arbitrary_burst(self,ch,signal_width,cycles,waveform,*arg):
         """
         Description: Uses N cycle burst functionallity of the Rigol DG4000 Series. Best 
         suited for external trigger.
@@ -687,6 +727,37 @@ class MOGLabs:
 # Quantum Composers
 #===========================================================================
 
+def robust_quantum_composer(method, *arg):
+    def robust_method(self, *arg):
+        try:
+            method(self,*arg)
+        except:
+            self.dev.close()
+            time.sleep(1)
+            if bool(self.arg) == 1:
+                self.dev = self.rm.open_resource(self.address,
+                                                 baud_rate = self.baud_rate,
+                                                 data_bits = 8,
+                                                 parity = Parity.none,
+                                                 stop_bits = StopBits.one)
+                self.mux_reset()  # clear all multiplexer
+                self.lev()  # set all outputs to TTL
+                self.t_sleep = 50e-3
+                self.digit   = 11   # important! round evertying to 11 digits
+            else:
+                self.dev = self.rm.open_resource(self.address)
+                self.mux_reset()   # clear all multiplexer
+                self.lev()    # set all outputs to TTL
+                self.dev.clear()
+                self.t_sleep = 50e-3
+                self.digit   = 11   # important! round evertying to 11 digits
+            method(self,*arg)
+        
+    robust_method.__name__ = method.__name__
+    robust_method.__doc__ = method.__doc__
+    robust_method.__module__ = method.__module__
+    return robust_method
+
 def sleep_method(method, *arg):
     t_sleep = 50e-3
     def sleeping_method(self, *arg):
@@ -703,10 +774,11 @@ class Quantum_Composers:
     @sleep_method
     def __init__(self,address,*arg):
         if arg:
+            self.arg = arg
             self.address = address
-            self.baud_rate = arg[0]
+            self.baud_rate = self.arg[0]
             self.rm = pyvisa.ResourceManager()
-            self.dev = self.rm.open_resource(address, # same as 'ASRL5::INSTR'
+            self.dev = self.rm.open_resource(self.address, # same as 'ASRL5::INSTR'
                                   baud_rate = self.baud_rate, # must identify
                                   data_bits = 8,
                                   parity = Parity.none,
@@ -716,9 +788,10 @@ class Quantum_Composers:
             self.t_sleep = 50e-3
             self.digit   = 11   # important! round evertying to 11 digits
         else:
+            self.arg = False
             self.address = address
             self.rm = pyvisa.ResourceManager()
-            self.dev = self.rm.open_resource(address)
+            self.dev = self.rm.open_resource(self.address)
             self.mux_reset()   # clear all multiplexer
             self.lev()    # set all outputs to TTL
             self.dev.clear()
@@ -732,11 +805,13 @@ class Quantum_Composers:
             return round(x,digit)
         
     @sleep_method
+    @robust_quantum_composer
     def t0(self,t):  # clock T0
         t = self.rd(t)
         self.dev.write(':PULSE0:PER {}'.format(t))
-        
+    
     @sleep_method
+    @robust_quantum_composer
     def norm(self,*ch):   # normal mode, no wait
         if bool(ch) == True:  # specified channel
             for __ch in ch:
@@ -749,31 +824,37 @@ class Quantum_Composers:
                 self.dev.write(':Pulse{}:CMODe NORMal'.format(__ch))
                 self.dev.write(':Pulse0:MODe NORMal')
                 
-    @sleep_method            
+    @sleep_method   
+    @robust_quantum_composer
     def wid(self,ch,w):
         w = self.rd(w)
         self.dev.write(':PULSE{}:WIDth {}'.format(ch,w))
         
     @sleep_method
+    @robust_quantum_composer
     def dly(self,ch,d):
         d = self.rd(d)
         self.dev.write(':PULSE{}:DELay {}'.format(ch,d))
         
     @sleep_method
+    @robust_quantum_composer
     def pol(self,ch,p):
         self.dev.write(':PULSE{}:POL {}'.format(ch,p))
         
     @sleep_method
+    @robust_quantum_composer
     def wcount(self,ch,w):  # wait number of T0 before enable output       
         self.dev.write(':PULSE{}:WCOunter {}'.format(ch,w))
         
     @sleep_method
+    @robust_quantum_composer
     def dcycl(self,ch,on,off):   # channel duty cycle
         self.dev.write(':Pulse{}:CMODe DCYCLe'.format(ch))
         self.dev.write(':PULSE{}:PCOunter {}'.format(ch,on))
         self.dev.write(':PULSE{}:OCOunter {}'.format(ch,off))
         
     @sleep_method
+    @robust_quantum_composer
     def lev(self,*p):    # set the output amplitude of a channel
         if bool(p) == True:  # adjustbale
             __ch = p[0]
@@ -789,6 +870,7 @@ class Quantum_Composers:
                 self.lev(__ch)
                 
     @sleep_method
+    @robust_quantum_composer
     def mux(self,*p):  ## multiplexer
         if bool(p) == True:
             __ch = p[0]
@@ -801,11 +883,13 @@ class Quantum_Composers:
             self.mux_reset()
             
     @sleep_method
+    @robust_quantum_composer
     def mux_reset(self):   # reset multiplexer
         for n in range(1,9): 
             self.mux(n,n)
             
     @sleep_method
+    @robust_quantum_composer
     def on(self,*ch):
         if bool(ch) == True:
             for channel in ch:
@@ -814,6 +898,7 @@ class Quantum_Composers:
             self.dev.write(':PULSE0:STAT ON')
             
     @sleep_method
+    @robust_quantum_composer
     def off(self,*ch):
         if bool(ch) == True:
             for channel in ch:
@@ -821,33 +906,40 @@ class Quantum_Composers:
         else:
             self.dev.write(':PULSE0:STAT OFF')
 
+    @robust_quantum_composer
     def trigOn(self):  # system mode: triggered
         self.off()
         self.dev.write(':PULSE0:TRIG:MOD TRIG')  # trig enabled 
         self.on()
         self.dev.write('*TRG')  # software trigger
 
-    @sleep_method        
+    @sleep_method
+    @robust_quantum_composer
     def cw(self): # continuous running mode
         self.dev.write(':PULSE0:TRIG:MOD DIS')  # trig disabled 
         
     @sleep_method
+    @robust_quantum_composer
     def trigOff(self):
         self.off()
         self.dev.write(':PULSE0:TRIG:MOD TRIG')  # trig enabled 
+    
     @sleep_method
+    @robust_quantum_composer
     def high(self,*ch):  ## keep output constantly at +5V
         for c in ch:
             self.dev.write(':PULSE{}:POL INV'.format(c))
             self.off(c)
             
     @sleep_method
+    @robust_quantum_composer
     def low(self,*ch):  ## keep output constantly at 0V
         for c in ch:
             self.dev.write(':PULSE{}:POL NORM'.format(c))
             self.off(c)
             
-    @sleep_method   
+    @sleep_method
+    @robust_quantum_composer
     def __exp(self,T0,ch,pol,tExp,tPls,tDly,nPls,nDly):  # experiment mode
         T0 = self.rd(T0)
         tExp = self.rd(tExp)
@@ -863,7 +955,8 @@ class Quantum_Composers:
         self.wcount(ch,nDly)  
         self.on(ch)
         
-    @sleep_method    
+    @sleep_method
+    @robust_quantum_composer
     def config(self,cfg):   # preset configuration
         if re.search('(cal)', cfg, re.IGNORECASE)!= None:   # cavity calibration
             self.mux_reset()
@@ -878,6 +971,7 @@ class Quantum_Composers:
             self.off(0,1,2,3,4,5,6,7,8)
             
     @sleep_method
+    @robust_quantum_composer
     def burst(self, ch, n_pulses):
         self.dev.write(':PULSe{}:CMOD BURS'.format(ch))
         self.dev.write(':PULSe{}:BCOunter {}'.format(ch,n_pulses))
@@ -893,34 +987,41 @@ class Agilent_ESG_SG:
         self.dev = self.rm.open_resource(self.address)
         self.dev.write_termination='\n'
         self.dev.read_termination='\n'
-        
+    
+    @robust
     def query(self):
         print(self.dev.query('OUTput?'))
         return
-     
+    
+    @robust
     def off(self):
         if int(self.dev.query('OUTput?')) == 1: # turn single output off
             self.dev.write(':OUTput OFF')  
         else:  # it is already off
             print('I am already off')
-            
+    
+    @robust        
     def on(self):
         if int(self.dev.query('OUTput?')) == 0: # turn single output off
             self.dev.write(':OUTput ON')  
         else:  # it is already off
             print('I am already on')
 
+    @robust        
     def freq(self,f): #define frequency and unit (Hz,kHz,MHz,GHz...)
         #self.dev.write(':FREQuency {} {}'.format(f,unit)) #for general units
         self.dev.write(':FREQuency {} MHz'.format(f))
 
+    @robust
     def lev(self,amplitude):  #define ampitude and unit {dBm,dBUV,V,VEMF}
         #self.dev.write('POWer:AMPLitude {} {}'.format(amp,unit))
         self.dev.write('POWer:AMPLitude {} dBm'.format(amplitude))
         
+    @robust
     def offset(self,amplitude,unit):  #define offset and unit {dBm,dBUV,V,VEMF}
         self.dev.write(':POWer:OFFSet {} {}'.format(amplitude,unit))
 
+    @robust
     def phase(self,phase,unit): #define phase and unit {radian,degrees}
         self.dev.write(':PHASe {} {}'.format(phase,unit))
 
@@ -934,19 +1035,24 @@ class tektronix_AFG3000:
         self.rm = pyvisa.ResourceManager()
         self.dev = self.rm.open_resource(self.address)
         
+    @robust
     def reset(self): #Reset
         self.dev.write("*RST")
         
+    @robust
     def off(self):  # default: both
         self.dev.write(':OUTPut OFF')
             
+    @robust
     def on(self): # default: both 
         self.dev.write(':OUTPut ON')
 
+    @robust
     def freq(self,ch,f):
         self.dev.write('SOURce{}:FREQuency:FIXed {}'.format(ch,self.__Hz(f)));
 
-    def __Hz(self, f): 
+    @staticmethod
+    def __Hz(f): 
         """
         Description: Sets all frequencies to MHz Unit
 
@@ -964,6 +1070,7 @@ class tektronix_AFG3000:
         else: # float, or str that contains only numbers
             return float(f)*1e6
 
+    @robust
     def lev(self,ch,v):
         if type(v) == str:
             __V = float(re.sub('[a-zA-Z]','',v))  # unitless value
@@ -978,12 +1085,15 @@ class tektronix_AFG3000:
         self.dev.write('SOURCe{}:VOLTage {}'.format(ch,__V))
         self.dev.write('SOURCe{}:VOLTage:UNIT VPP')
 
+    @robust
     def offset(self,ch,offset):  # V_DC
         self.dev.write('SOURce{}:VOLTage:LEVel:IMMediate:OFFSet {}'.format(ch,offset));
 
+    @robust
     def phase(self,ch,phase):
         self.dev.write('SOURce{}:PHASe {}'.format(ch,phase));
         
+    @robust
     def burst_delay(self,ch,tdelay):
         self.dev.write('SOURce{}:BURS:TDEL {}ns'.format(ch,tdelay))
     
@@ -1010,6 +1120,7 @@ class tektronix_AFG3000:
         factor = max([np.abs(max(waveform)),np.abs(min(waveform))])
         return np.array(waveform)/np.absolute(factor)
     
+    @robust
     def arbitrary(self, ch, signal_width, waveform, *arg):
         """
         Description: Allows one to set and create arbitrary waveform output 
@@ -1022,44 +1133,39 @@ class tektronix_AFG3000:
         """
         buffer_size = 2**14-2
         
+        
         if inspect.ismethod(waveform) == True or inspect.isfunction(waveform) == True:
 
             t = np.linspace(0,signal_width,buffer_size)
             data = waveform(t,*arg)
-
             datastring = self.normalize(data)
-            m = buffer_size / (datastring.max() - datastring.min())
-            b = -m * datastring.min()
-            dac_values = (m * datastring + b)
-            np.around(dac_values, out=dac_values)
-            dac_values = dac_values.astype(np.uint16)
-
+            
         else:
+            
             data = waveform
             datastring = self.normalize(data)
-            m = buffer_size / (datastring.max() - datastring.min())
-            b = -m * datastring.min()
-            dac_values = (m * datastring + b)
-            np.around(dac_values, out=dac_values)
-            dac_values = dac_values.astype(np.uint16)
             
-        if data[0] != data[-1]:
-            data[0] = 0
-            data[-1] = data[0]
-        else:
-            pass
+        if (datastring.max() - datastring.min()) == 0:
+            raise ValueError('Use the DC-function')
+        m = buffer_size / (datastring.max() - datastring.min())
+        b = -m * datastring.min()
+        dac_values = (m * datastring + b)
+        np.around(dac_values, out=dac_values)
+        dac_values = dac_values.astype(np.uint16)
             
         self.dev.write('DATA:DEFine EMEMory,{}'.format(len(data)))
         self.dev.write_binary_values("DATA:DATA EMEM1,", dac_values, datatype="H", is_big_endian=True)
         self.dev.write("SOURce{}:FUNC:SHAPE EMEM1".format(ch))
         self.dev.write("SOURce{}:VOLTage:LEVel:IMMediate:LOW {}".format(ch,min(data)))
         self.dev.write("SOURce{}:VOLTage:LEVel:IMMediate:HIGH {}".format(ch,max(data)))
-        self.dev.write("SOURce{}:FREQ {}".format(ch, self.__Hz(1/signal_width)))
+        self.dev.write("SOURce{}:FREQuency:FIXED {}".format(ch, 1/signal_width))
 
+    @robust
     def ext_trig(self):
         self.dev.write("TRIGger:SEQuence:SOURce EXTernal")
     
-    def burst(self, ch, mode, cycles):
+    @robust
+    def burst_mode(self, ch, mode, cycles):
         """
         Description: Allows on to use burst functionallity
 
@@ -1073,6 +1179,12 @@ class tektronix_AFG3000:
         self.dev.write("SOURCE{}:BURSt:NCYC {}".format(ch,cycles))
         self.dev.write("SOURCE{}:BURSt:STAT ON".format(ch))
     
+    @robust
+    def burst_state(self, ch, state):
+        states = ['OFF','ON']
+        self.dev.write('SOURce{}:BURSt:STAT {}'.format(ch, states[state]))
+    
+    @robust
     def DC(self, ch, offset):
         """
         Description: Enables DC Mode (Tested 04/03/2022)
@@ -1105,7 +1217,8 @@ class Rigol_DP800:
         self.address = address            
         self.rm = pyvisa.ResourceManager()
         self.dev = self.rm.open_resource(self.address)
-        
+    
+    @robust
     def inspect(self): 
         """ 
         Description: This function will return to you the current settings of the 
@@ -1135,7 +1248,8 @@ class Rigol_DP800:
         except:
             print('unable to obtain parameters')
         return
-        
+    
+    @robust
     def set_safety(self): 
         """ 
         Description: This function will return to you the current settings of the 
@@ -1159,6 +1273,7 @@ class Rigol_DP800:
             print('unable to excecute')
         return
     
+    @robust
     def on(self, *ch): 
         """ 
         Description: Will turn on specified channel
@@ -1178,6 +1293,7 @@ class Rigol_DP800:
                 self.dev.write(':OUTP CH{}, ON'.format(i))
         return
     
+    @robust
     def off(self, *ch): 
         """ 
         Description: Will turn off specified channel
@@ -1197,6 +1313,7 @@ class Rigol_DP800:
                 self.dev.write(':OUTP CH{}, OFF'.format(i))
         return
     
+    @robust
     def current(self, ch, *current): 
         """ 
         Description: This function will set or get the current of the specified channel
@@ -1213,9 +1330,9 @@ class Rigol_DP800:
             self.dev.write('SOUR{}:CURR {}'.format(ch,current[0])) #Units Amps
         else:
             self.dev.write('SOUR{}:CURR?'.format(ch))
- 
         return
 
+    @robust
     def voltage(self, ch, *voltage): 
         """ 
         Description: This function will set or get the voltage of the specified channel
@@ -1232,5 +1349,4 @@ class Rigol_DP800:
             self.dev.write('SOUR{}:VOLT {}'.format(ch,voltage[0])) #Units Volts
         else:
             print(self.dev.query('SOUR{}:VOLT?'.format(ch)))
- 
         return

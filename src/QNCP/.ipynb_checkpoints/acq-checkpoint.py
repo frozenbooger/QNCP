@@ -27,6 +27,22 @@ def robust(method, *arg):
     robust_method.__module__ = method.__module__
     return robust_method
 
+def robust_return(method, *arg):
+    def robust_method(self, *arg):
+        try:
+            result = method(self,*arg)
+        except:
+            self.dev.close()
+            time.sleep(1)
+            self.dev = self.rm.open_resource(self.address)
+            result = method(self,*arg)
+        return result
+        
+    robust_method.__name__ = method.__name__
+    robust_method.__doc__ = method.__doc__
+    robust_method.__module__ = method.__module__
+    return robust_method
+
 #================================================================
 # Spectrum Analyzer - Rigol_DSA800 series 
 #================================================================
@@ -39,7 +55,7 @@ class Rigol_DSA800:
         self.dev.write_termination='\n'
         self.dev.read_termination='\n'
 
-    @robust    
+    @robust_return    
     def center_freq(self,*f):  # center frequency
         if bool(f) == True:
             __f = f[0]
@@ -49,7 +65,7 @@ class Rigol_DSA800:
             __freq = float(re.search('.*(?=\n)',__readOut).group())*1e-6
             return __freq
 
-    @robust
+    @robust_return
     def span_freq(self,*f):  # frequency range 
         if bool(f) == True: 
             __f = f[0] 
@@ -59,7 +75,7 @@ class Rigol_DSA800:
             __freq = float(re.search('.*(?=\n)',__readOut).group())*1e-6
             return __freq
 
-    @robust
+    @robust_return
     def rbw(self,*f):  # resolution bandwidth
         if bool(f) == True:
             __f = f[0]
@@ -68,7 +84,7 @@ class Rigol_DSA800:
             __readOut = self.dev.query(':SENSe:BANDwidth:RESolution?')
             __freq = float(re.search('.*(?=\n)',__readOut).group())*1e-6
             return __freq
-    @robust    
+    @robust_return    
     def vbw(self,*f):  # video bandwidth
         if bool(f) == True:
             __f = f[0]
@@ -78,7 +94,7 @@ class Rigol_DSA800:
             __freq = float(re.search('.*(?=\n)',__readOut).group())*1e-6
             return __freq
         
-    @robust
+    @robust_return
     def __Hz(self,f):  # in Hz, support unit. Default: MHz
         if type(f) == str:
             if re.search('[mM]',f) != None:
@@ -102,7 +118,7 @@ class Rigol_DSA800:
         self.dev.write('SENS:FREQ:STARt {}'.format(f_lower))
         self.dev.write('SENS:FREQ:STOP {}'.format(f_upper))        
         
-    @robust
+    @robust_return
     def monitor(self): ##print spectral signal, can also detect peaks
         
         ##ask for freq limits for plotting
@@ -136,7 +152,7 @@ class Rigol_DSA800:
         
         return freq, data
     
-    @robust
+    @robust_return
     def detect_peaks(self): #find peaks
 
         ##initiate
@@ -167,7 +183,7 @@ class Rigol_DS1000E:
         self.dev = self.rm.open_resource(self.address)
         self.run()
 
-    @robust
+    @robust_return
     def meas(self,ch,var):  # measure 
         if type(ch) == str:  # channel info
             __ch = re.search('\d',ch).group()
@@ -221,6 +237,10 @@ class Rigol_DS1000z:
         self.rm = pyvisa.ResourceManager()
         self.dev = self.rm.open_resource(self.address)
         self.run()
+        
+    @robust
+    def reset(self):
+        self.dev.write('*RST')
 
     @robust
     def measure(self,ch,var):  # measure 
@@ -244,7 +264,7 @@ class Rigol_DS1000z:
     def single(self):
         self.dev.write(':SINGle')
     
-    @robust
+    @robust_return
     def screenshot(self,ch):
         """ 
         Description: The screenshot function acquires the time and voltage information
@@ -307,7 +327,7 @@ class Rigol_DS1000z:
         Output: None : None 
 
         Example: 
-        >>stochastic_search()
+        >>trigger_set(1,0,3)
 
         """
         edges = ['POS','NEG','RFAL']
@@ -325,8 +345,12 @@ class Rigol_DMO5000:
         self.rm = pyvisa.ResourceManager()
         self.dev = self.rm.open_resource(self.address)
         self.run()
-
+        
     @robust
+    def reset(self):
+        self.dev.write('*RST')
+
+    @robust_return
     def measure(self,ch,var):  # measure 
         if type(ch) == str:  # channel info
             __ch = re.search('\d',ch).group()
@@ -348,8 +372,8 @@ class Rigol_DMO5000:
     @robust
     def single(self):
         self.dev.write(':SINGle')
-        
-    @robust
+    
+    @robust_return
     def screenshot(self,ch):
         """ 
         Description: The screenshot function acquires the time and voltage information
@@ -466,7 +490,6 @@ class thorlabs_polarimeter:
                 raise ValueError('Wavelength not supported (900-1700nm)')
         else:
             print('check polarimeter connection')
-        return
 
     @robust
     def trigger_data_collection(self):
@@ -480,7 +503,6 @@ class thorlabs_polarimeter:
 
         """
         self.dev.write('INP:ROT:STAT 1')
-        return
         
     @robust
     def close_data_collection(self):
@@ -494,9 +516,8 @@ class thorlabs_polarimeter:
 
         """
         self.dev.write('INP:ROT:STAT 0')
-        return
     
-    @robust
+    @robust_return
     def get_polarization_params(self):
         """ 
         Description: Returns the current measured Stokes parameters
@@ -520,7 +541,7 @@ class thorlabs_polarimeter:
         s3 = np.sin(2 * chi)
         return s1, s2, s3, dop, power
 
-    @robust
+    @robust_return
     def get_raw_data(self):
         """ 
         Description: Returns the raw data read from the polarimeter 

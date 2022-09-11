@@ -24,6 +24,22 @@ def robust(method, *arg):
     robust_method.__module__ = method.__module__
     return robust_method
 
+def robust_return(method, *arg):
+    def robust_method(self, *arg):
+        try:
+            result = method(self,*arg)
+        except:
+            self.dev.close()
+            time.sleep(1)
+            self.dev = self.rm.open_resource(self.address)
+            result = method(self,*arg)
+        return result
+        
+    robust_method.__name__ = method.__name__
+    robust_method.__doc__ = method.__doc__
+    robust_method.__module__ = method.__module__
+    return robust_method
+
 #================================================================
 # Valon_5015('Pete' or 'Ringo')
 #================================================================

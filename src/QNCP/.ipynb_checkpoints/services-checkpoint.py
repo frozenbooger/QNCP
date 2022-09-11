@@ -227,7 +227,6 @@ class AM_characterization:
         ax.text(0.03, 0.92, textstr, transform=ax.transAxes, fontsize=12,
                 verticalalignment='top', bbox=props)
 
-        plt.style.use('dark_background')
         plt.rcParams["figure.figsize"] = (10,5)
         plt.legend()
         plt.show()
@@ -275,7 +274,6 @@ class AM_characterization:
         cycles = 1
         self.gen.burst(self.gench, mode, cycles)
         time.sleep(1)
-        
         
     def get_max_min_acq(self):
         """ 

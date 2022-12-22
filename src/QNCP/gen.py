@@ -12,21 +12,6 @@ import time
 def robust(method, *arg):
     def robust_method(self, *arg):
         try:
-            method(self,*arg)
-        except:
-            self.dev.close()
-            time.sleep(1)
-            self.dev = self.rm.open_resource(self.address)
-            method(self,*arg)
-        
-    robust_method.__name__ = method.__name__
-    robust_method.__doc__ = method.__doc__
-    robust_method.__module__ = method.__module__
-    return robust_method
-
-def robust_return(method, *arg):
-    def robust_method(self, *arg):
-        try:
             result = method(self,*arg)
         except:
             self.dev.close()
@@ -100,7 +85,6 @@ class Valon_5015:
 # Function Generator - Rigol DSG800 series
 #================================================================
 
-@robust
 class Rigol_DSG800:
     
     def __init__(self,address,*arg):
@@ -206,7 +190,7 @@ class Rigol_DG4000:
             self.dev.write(':OUTput1 ON') 
             self.dev.write(':OUTput2 ON')
 
-    @staticmethod        
+    @robust        
     def __Hz(self,f):  # in Hz, support unit. Default: MHz
         """
         Description: Sets all frequencies to MHz Unit (Tested 07/15/2022)
@@ -746,7 +730,7 @@ class MOGLabs:
 def robust_quantum_composer(method, *arg):
     def robust_method(self, *arg):
         try:
-            method(self,*arg)
+            result = method(self,*arg)
         except:
             self.dev.close()
             time.sleep(1)
@@ -767,7 +751,8 @@ def robust_quantum_composer(method, *arg):
                 self.dev.clear()
                 self.t_sleep = 50e-3
                 self.digit   = 11   # important! round evertying to 11 digits
-            method(self,*arg)
+            result = method(self,*arg)
+        return result
         
     robust_method.__name__ = method.__name__
     robust_method.__doc__ = method.__doc__

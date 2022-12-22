@@ -11,23 +11,12 @@ from scipy.signal import find_peaks
 import inspect
 import vxi11
 import time
+import socket
+import json
+import threading
+import ast
 
 def robust(method, *arg):
-    def robust_method(self, *arg):
-        try:
-            method(self,*arg)
-        except:
-            self.dev.close()
-            time.sleep(1)
-            self.dev = self.rm.open_resource(self.address)
-            method(self,*arg)
-        
-    robust_method.__name__ = method.__name__
-    robust_method.__doc__ = method.__doc__
-    robust_method.__module__ = method.__module__
-    return robust_method
-
-def robust_return(method, *arg):
     def robust_method(self, *arg):
         try:
             result = method(self,*arg)
@@ -55,7 +44,7 @@ class Rigol_DSA800:
         self.dev.write_termination='\n'
         self.dev.read_termination='\n'
 
-    @robust_return    
+    @robust    
     def center_freq(self,*f):  # center frequency
         if bool(f) == True:
             __f = f[0]
@@ -65,7 +54,7 @@ class Rigol_DSA800:
             __freq = float(re.search('.*(?=\n)',__readOut).group())*1e-6
             return __freq
 
-    @robust_return
+    @robust
     def span_freq(self,*f):  # frequency range 
         if bool(f) == True: 
             __f = f[0] 
@@ -75,7 +64,7 @@ class Rigol_DSA800:
             __freq = float(re.search('.*(?=\n)',__readOut).group())*1e-6
             return __freq
 
-    @robust_return
+    @robust
     def rbw(self,*f):  # resolution bandwidth
         if bool(f) == True:
             __f = f[0]
@@ -84,7 +73,7 @@ class Rigol_DSA800:
             __readOut = self.dev.query(':SENSe:BANDwidth:RESolution?')
             __freq = float(re.search('.*(?=\n)',__readOut).group())*1e-6
             return __freq
-    @robust_return    
+    @robust    
     def vbw(self,*f):  # video bandwidth
         if bool(f) == True:
             __f = f[0]
@@ -94,7 +83,7 @@ class Rigol_DSA800:
             __freq = float(re.search('.*(?=\n)',__readOut).group())*1e-6
             return __freq
         
-    @robust_return
+    @robust
     def __Hz(self,f):  # in Hz, support unit. Default: MHz
         if type(f) == str:
             if re.search('[mM]',f) != None:
@@ -118,7 +107,7 @@ class Rigol_DSA800:
         self.dev.write('SENS:FREQ:STARt {}'.format(f_lower))
         self.dev.write('SENS:FREQ:STOP {}'.format(f_upper))        
         
-    @robust_return
+    @robust
     def monitor(self): ##print spectral signal, can also detect peaks
         
         ##ask for freq limits for plotting
@@ -152,7 +141,7 @@ class Rigol_DSA800:
         
         return freq, data
     
-    @robust_return
+    @robust
     def detect_peaks(self): #find peaks
 
         ##initiate
@@ -183,7 +172,7 @@ class Rigol_DS1000E:
         self.dev = self.rm.open_resource(self.address)
         self.run()
 
-    @robust_return
+    @robust
     def meas(self,ch,var):  # measure 
         if type(ch) == str:  # channel info
             __ch = re.search('\d',ch).group()
@@ -264,7 +253,7 @@ class Rigol_DS1000z:
     def single(self):
         self.dev.write(':SINGle')
     
-    @robust_return
+    @robust
     def screenshot(self,ch):
         """ 
         Description: The screenshot function acquires the time and voltage information
@@ -306,11 +295,27 @@ class Rigol_DS1000z:
         Output: None : none : None
         Example: 
         >> acq1.scale_offset(ch, (max_volt-min_volt)/8, -(max_volt-min_volt)/4)
-
-        np.array([0,1,2,3,4,...,99,100]),np.array([0,1,2,3,2,...,2,3])
         """
         self.dev.write(':CHANnel{}:SCAL {}'.format(ch,scale))
         self.dev.write(':CHANnel{}:OFFS {}'.format(ch,offset))
+        
+    @robust
+    def time_scale_offset(self, scale, offset):
+        """ 
+        Description: The scale_offset function sets the timing scale and offset parameters of an 
+        oscilliscope 
+
+        Input: ch : channel : integer = {1,2,3,4}
+               scale : usually in the order of your signal width/4 : float
+               offset : usually a multiple of the scale : float
+               
+        Output: None : none : None
+        Example: 
+        >> acq1.scale_offset(ch, 1e-6/4, 0)
+
+        """
+        self.dev.write('TIMebase:MAIN:SCAL {}'.format(scale))
+        self.dev.write('TIMebase:MAIN:OFFS {}'.format(offset))
         
     @robust
     def channel_state(self, ch, state):
@@ -350,7 +355,7 @@ class Rigol_DMO5000:
     def reset(self):
         self.dev.write('*RST')
 
-    @robust_return
+    @robust
     def measure(self,ch,var):  # measure 
         if type(ch) == str:  # channel info
             __ch = re.search('\d',ch).group()
@@ -373,7 +378,7 @@ class Rigol_DMO5000:
     def single(self):
         self.dev.write(':SINGle')
     
-    @robust_return
+    @robust
     def screenshot(self,ch):
         """ 
         Description: The screenshot function acquires the time and voltage information
@@ -416,10 +421,27 @@ class Rigol_DMO5000:
         Example: 
         >> acq1.scale_offset(ch, (max_volt-min_volt)/8, -(max_volt-min_volt)/4)
 
-        np.array([0,1,2,3,4,...,99,100]),np.array([0,1,2,3,2,...,2,3])
         """
         self.dev.write(':CHANnel{}:SCAL {}'.format(ch,np.round(scale,4)))
         self.dev.write(':CHANnel{}:OFFS {}'.format(ch,np.round(offset,4)))
+        
+    @robust
+    def time_scale_offset(self, scale, offset):
+        """ 
+        Description: The scale_offset function sets the timing scale and offset parameters of an 
+        oscilliscope 
+
+        Input: ch : channel : integer = {1,2,3,4}
+               scale : usually in the order of your signal width/4 : float
+               offset : usually a multiple of the scale : float
+               
+        Output: None : none : None
+        Example: 
+        >> acq1.scale_offset(ch, 1e-6/4, 0)
+
+        """
+        self.dev.write('TIMebase:MAIN:SCAL {}'.format(scale))
+        self.dev.write('TIMebase:MAIN:OFFS {}'.format(offset))
         
     @robust
     def channel_state(self, ch, state):
@@ -436,7 +458,7 @@ class Rigol_DMO5000:
         Output: None : None 
 
         Example: 
-        >>stochastic_search()
+        >>trigger_set()
 
         """
         edges = ['POS','NEG','RFAL']
@@ -464,8 +486,9 @@ class thorlabs_polarimeter:
         self.address = address
         self.rm = pyvisa.ResourceManager()
         self.dev = self.rm.open_resource(self.address)
-        self.dev.write('SENS:CALC:MODE 1')
-        self.dev.write('SENS:POW:RANG:IND 8')
+        self.dev.write('SENS:POW:RANG:AUTO 1')
+        self.dev.write('SENS:CALC:MODE 9')
+        
         
     @robust
     def set_wavelength(self,wavelength):
@@ -517,7 +540,7 @@ class thorlabs_polarimeter:
         """
         self.dev.write('INP:ROT:STAT 0')
     
-    @robust_return
+    @robust
     def get_polarization_params(self):
         """ 
         Description: Returns the current measured Stokes parameters
@@ -541,7 +564,7 @@ class thorlabs_polarimeter:
         s3 = np.sin(2 * chi)
         return s1, s2, s3, dop, power
 
-    @robust_return
+    @robust
     def get_raw_data(self):
         """ 
         Description: Returns the raw data read from the polarimeter 
@@ -572,6 +595,411 @@ class thorlabs_polarimeter:
     @robust
     def set_mode(self, mode):
         self.dev.write('SENS:CALC:MODE {}'.format(mode))
+        
+    @robust
+    def set_auto_power_range(self, state : bool):
+        self.dev.write('SENS:POW:RANG:AUTO {}'.format(state))
+        
+        
+#================================================================
+# Single Quantum SNSPD
+#================================================================ 
+        
+def synchronized_method(method, *args, **kws):
+    outer_lock = threading.Lock()
+    lock_name = "__" + method.__name__ + "_lock" + "__"
+
+    def sync_method(self, *args, **kws):
+        with outer_lock:
+            if not hasattr(self, lock_name):
+                setattr(self, lock_name, threading.Lock())
+            lock = getattr(self, lock_name)
+            with lock:
+                return method(self, *args, **kws)
+    sync_method.__name__ = method.__name__
+    sync_method.__doc__ = method.__doc__
+    sync_method.__module__ = method.__module__
+    return sync_method
+
+
+def _synchronized_method(method):
+    return decorate(method, _synchronized_method)
+
+
+def synchronized_with_attr(lock_name):
+    def decorator(method):
+        def synced_method(self, *args, **kws):
+            lock = getattr(self, lock_name)
+            with lock:
+                return method(self, *args, **kws)
+        synced_method.__name__ = method.__name__
+        synced_method.__doc__ = method.__doc__
+        synced_method.__module__ = method.__module__
+        return synced_method
+    return decorator
+
+class SQTalk(threading.Thread):
+    def __init__(self, TCP_IP_ADR='localhost', TCP_IP_PORT=12000, error_callback=None, TIME_OUT=0.1):
+        threading.Thread.__init__(self)
+        self.TCP_IP_ADR = TCP_IP_ADR
+        self.TCP_IP_PORT = TCP_IP_PORT
+
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.settimeout(TIME_OUT)
+        self.socket.connect((self.TCP_IP_ADR, self.TCP_IP_PORT))
+        self.BUFFER = 10000000
+        self.shutdown = False
+        self.labelProps = dict()
+
+        self.error_callback = error_callback
+
+        self.lock = threading.Lock()
+
+    @synchronized_method
+    def close(self):
+        # Print("Closing Socket")
+        self.socket.close()
+        self.shutdown = True
+
+    @synchronized_method
+    def send(self, msg):
+        if sys.version_info.major == 3:
+            self.socket.send(bytes(msg, "utf-8"))
+        if sys.version_info.major == 2:
+            self.socket.send(msg)
+
+    def sub_jsons(self, msg):
+        """Return sub json strings.
+        {}{} will be returned as [{},{}]
+        """
+        i = 0
+        result = []
+        split_msg = msg.split('}{')
+        for s in range(len(split_msg)):
+            if i == 0 and len(split_msg) == 1:
+                result.append(split_msg[s])
+            elif i == 0 and len(split_msg) > 1:
+                result.append(split_msg[s] + "}")
+            elif i == len(split_msg) - 1 and len(split_msg) > 1:
+                result.append("{" + split_msg[s])
+            else:
+                result.append("{" + split_msg[s] + "}")
+            i += 1
+        return result
+
+    @synchronized_method
+    def add_labelProps(self, data):
+        if "label" in data.keys():
+            # After get labelProps, queries also bounds, units etc...
+            if isinstance(data["value"], (dict)):
+                self.labelProps[data["label"]] = data["value"]
+            # General label communication, for example from broadcasts
+            else:
+                try:
+                    self.labelProps[data["label"]
+                                    ]["value"] = data["value"]
+                except Exception:
+                    None
+
+    @synchronized_method
+    def check_error(self, data):
+        if "label" in data.keys():
+            if "Error" in data["label"]:
+                self.error_callback(data["value"])
+
+    @synchronized_method
+    def get_label(self, label):
+        timeout = 10
+        dt = .1
+        i = 0
+        while True:
+            if i * dt > timeout:
+                raise IOError("Could not acquire label")
+            try:
+                return self.labelProps[label]
+            except Exception:
+                time.sleep(dt)
+            i += 1
+
+    @synchronized_method
+    def get_all_labels(self, label):
+        return self.labelProps
+
+    def run(self):
+        self.send(json.dumps({"request": "labelProps", "value": "None"}))
+        rcv_msg = []
+
+        self.send(json.dumps(
+            {"request": "labelProps", "value": "None"}))
+        rcv_msg = []
+
+        while self.shutdown is False:
+            try:
+                rcv = ""+rcv_msg[1]
+            except:
+                rcv = ""
+            data = {}
+            r = ""
+            while ("\x17" not in rcv) and (self.shutdown == False):
+                try:
+                    if sys.version_info.major == 3:
+                        r = str(self.socket.recv(self.BUFFER), 'utf-8')
+                    elif sys.version_info.major == 2:
+                        r = self.socket.recv(self.BUFFER)
+                except Exception as e:
+                    None
+                rcv = rcv + r
+
+            rcv_msg = rcv.split("\x17")
+
+            for rcv_line in rcv_msg:
+                rcv_split = self.sub_jsons(rcv_line)
+                for msg in rcv_split:
+                    try:
+                        data = json.loads(msg)
+                    except Exception:
+                        None
+
+                    with self.lock:
+                        self.add_labelProps(data)
+                        self.check_error(data)
+
+
+class SQCounts(threading.Thread):
+    def __init__(self, TCP_IP_ADR='localhost', TCP_IP_PORT=12345, CNTS_BUFFER=100, TIME_OUT=10):
+        threading.Thread.__init__(self)
+        self.lock = threading.Lock()
+        self.rlock = threading.RLock()
+        self.TCP_IP_ADR = TCP_IP_ADR
+        self.TCP_IP_PORT = TCP_IP_PORT
+
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.settimeout(TIME_OUT)
+        self.socket.connect((self.TCP_IP_ADR, self.TCP_IP_PORT))
+        # self.socket.settimeout(.1)
+        self.BUFFER = 1000000
+        self.shutdown = False
+
+        self.cnts = []
+        self.CNTS_BUFFER = CNTS_BUFFER
+        self.n = 0
+
+    @synchronized_method
+    def close(self):
+        #print("Closing Socket")
+        self.socket.close()
+        self.shutdown = True
+
+    @synchronized_method
+    def get_n(self, n):
+        n0 = self.n
+        while self.n < n0 + n:
+            time.sleep(0.001)
+        cnts = self.cnts
+        return cnts[-n:]
+
+    def run(self):
+        data = []
+        while self.shutdown == False:
+            if sys.version_info.major == 3:
+                try:
+                    data_raw = str(self.socket.recv(self.BUFFER), 'utf-8')
+                except:
+                    data_raw = ""
+                    None  # Happens while closing
+            elif sys.version_info.major == 2:
+                data_raw = self.socket.recv(self.BUFFER)
+
+            data_newline = data_raw.split('\n')
+
+            v = []
+            for d in data_newline[0].split(','):
+                try:
+                    v.append(float(d))
+                except:
+                    None
+
+
+            with self.lock:
+                self.cnts.append(v)
+                # Keep Size of self.cnts
+                l = len(self.cnts)
+                if l > self.CNTS_BUFFER:
+                    self.cnts = self.cnts[l-self.CNTS_BUFFER:]
+                self.n += 1
+
+class sq_snspd:
+    def __init__(self,address, timeout=10):
+        """
+        Description: Initialize SNSPD
+        
+        Input: address : IP-address : string
+               timeout : timeout time : float
+        Output: None
+        """
+        
+        self.CONTROL_PORT = 12000
+        self.COUNTS_PORT = 12345
+        self.NUMBER_OF_DETECTORS = 0
+        self.address = address
+        self.talk = SQTalk(TCP_IP_ADR=self.address,  TCP_IP_PORT=self.CONTROL_PORT,
+                           error_callback=self.error, TIME_OUT=timeout)
+        
+        # Daemonic Thread close when main progam is closed
+        self.talk.daemon = True
+        self.talk.start()
+
+        self.cnts = SQCounts(TCP_IP_ADR=self.address,
+                             TCP_IP_PORT=self.COUNTS_PORT, TIME_OUT=timeout)
+        # Daemonic Thread close when main progam is closed
+        self.cnts.daemon = True
+        self.cnts.start()
+
+        self.NUMBER_OF_DETECTORS = self.talk.get_label("NumberOfDetectors")["value"]
+        
+        
+    def auto_bias_calibration(self, state=True, DarkCounts=[100, 100, 100, 100]):
+        """        
+        Description: Starts an automatic bias current search. The bias current will be set to match the dark countsself.
+        For this function to work properly the detectors should not be exposed to light.
+        This function is blocking.
+        
+        Returns the found bias currents.
+        
+        Input: None
+        Output: bias currents : list
+        """     
+        msg = json.dumps(dict(command="DarkCountsAutoIV", value=DarkCounts))
+        self.talk.send(msg)
+        msg = json.dumps(dict(command="AutoCaliBiasCurrents", value=state))
+        self.talk.send(msg)
+        time.sleep(1)
+        while self.talk.get_label("StartAutoIV")["value"] == True:
+            time.sleep(.1)        
+        return self.talk.get_label("BiasCurrentAutoIV")["value"]
+    
+    def get_bias_current(self):
+        return self.talk.get_label("BiasCurrent")["value"]
+    
+    def get_number_of_detectors(self):
+        return self.talk.get_label("NumberOfDetectors")["value"]
+    
+    def get_bias_voltages(self):
+        """
+        Description: get bias voltages
+        
+        Input: None
+        Output: bias voltages : list
+        """
+        msg = json.dumps(dict(request="BiasVoltage"))
+        self.talk.send(msg)
+        return self.talk.get_label("BiasVoltage")["value"]
+
+    
+    def get_measurement_period(self):
+        """
+        Description: get measurement period
+        
+        Input: None
+        Output: measurement period : int
+        """
+        return str(self.talk.get_label("InptMeasurementPeriod")["value"]) + ' ms'
+    
+    
+    def get_number_of_detectors(self):
+        """
+        Description: get number of detectors 
+        
+        Input: 
+        Output: bias voltages : list
+        """
+        return self.talk.get_label("NumberOfDetectors")["value"]
+    
+    
+    def get_trigger_level(self):
+        """
+        Description: get trigger levels in mV
+        
+        Input: None
+        Output: trigger levels : list
+        """
+        return self.talk.get_label("TriggerLevel")["value"]
+    
+    def set_bias_current(self,currents : list):
+        """
+        Description: set bias currents in μA
+        
+        Input: currents : current in μA : list
+        Output: None
+        """
+        array = currents
+        msg = json.dumps(dict(command="SetAllBiasCurrents",
+                              label="BiasCurrent", value=array))
+        self.talk.send(msg)
+        
+        
+    def set_trigger_level(self,trigger_levels : list):
+        """
+        Description: set trigger levels in mV
+        
+        Input: trigger_levels : trigger levels in mV : list
+        Output: None
+        """
+        array = trig
+        msg = json.dumps(dict(command="SetAllTriggerLevels",
+                              label="TriggerLevel", value=array))
+        self.talk.send(msg)
+        
+        
+    def set_measurement_period(self, period : float):
+        """
+        Description: set measurement period in ms
+        
+        Input: period : measurement period : float
+        Output: None
+        """
+        msg = json.dumps(
+            dict(
+                command="SetMeasurementPeriod",
+                label="InptMeasurementPeriod",
+                value=period))
+        
+        self.talk.send(msg)
+    
+        
+    def enable_detectors(self, state=True):
+        """
+        Description: enable detectors
+        
+        Input: None
+        Output: None
+        """
+        msg = json.dumps(dict(command="DetectorEnable", value=state))
+        self.talk.send(msg)
+    
+    def acquire(self,Ncounts):
+        """
+        Description: acquire N data points
+        
+        Input: Ncounts : data points : list
+        Output: None
+        """
+        return self.cnts.get_n(Ncounts)
+    
+    def close(self):
+        """
+        Description: close connection
+        
+        Input: None
+        Output: None
+        """
+        self.talk.close()
+        self.talk.join()
+        
+    def error(self, error_msg):
+        """Called in case of an error"""
+        print("ERROR DETECTED")
+        print(error_msg)
         
 #================================================================
 # QuTools GMBH QuTAG

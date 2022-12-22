@@ -13,6 +13,7 @@ src/qncp/device.py
 src/qncp/gen.py
 src/qncp/models.py
 src/qncp/opt.py
+src/qncp/optics.py
 src/qncp/redpitaya.py
 src/qncp/search.py
 src/qncp/services.py

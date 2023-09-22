@@ -7,8 +7,13 @@ import math
 from scipy.signal import find_peaks
 import inspect
 import vxi11
-import socket
 import time
+import socket
+import serial
+import select
+from struct import unpack
+from collections import OrderedDict
+CRLF = b'\r\n'
 
 def robust(method, *arg):
     def robust_method(self, *arg):

@@ -10,7 +10,7 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     url='https://github.com/frozenbooger/QNCP',
-    keywords='Quantum Network Control Panel',
+    keywords='Quantum Network Control Protocol Suite',
     install_requires=[
         'matplotlib',
         'numpy',

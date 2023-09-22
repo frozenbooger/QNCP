@@ -385,9 +385,6 @@ class AM_characterization:
             self.gen.arbitrary(self.gench,signal_width,waveform,center,fwhm,1)
             self.gen.offset(self.gench,minimum+0.5*np.abs(maximum - minimum))
         self.gen.lev(self.gench,np.abs(maximum - minimum))
-        mode = 0
-        cycles = 1
-        self.gen.burst(self.gench, mode, cycles)
         self.gen.on()
         
     def send_max_DC(self):

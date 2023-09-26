@@ -13,6 +13,7 @@ import serial
 import select
 from struct import unpack
 from collections import OrderedDict
+import six
 CRLF = b'\r\n'
 
 def robust(method, *arg):
@@ -60,8 +61,7 @@ class Valon_5015:
             else:
                 self.write('Freq {} MHz;'.format(f[0]));
         else:   # when no input is entered, read actual frequency 
-            self.write('Freq?;')
-            self.__readOut = self.read()
+            self.__readOut = self.query('Freq?;')
             self.__freqAct = float(re.search('(?<=Act )\S+',self.__readOut).group())
             return self.__freqAct
 
@@ -74,8 +74,7 @@ class Valon_5015:
             else:
                 self.write('PWR {};'.format(l[0]));
         else:  # when empty input, read actual level
-            self.write('PWR?;')
-            self.__readOut = self.read()
+            self.__readOut = self.query('PWR?;')
             self.__levAct = float(re.search('(?<=PWR ).*(?=\;)',self.__readOut).group())
             return self.__levAct
         
@@ -84,9 +83,15 @@ class Valon_5015:
         self.clear()    
         self.dev.write(arg)
         
+    # @robust
+    # def read(self):
+    #     return self.dev.read()
+
     @robust
-    def read(self):
-        return self.dev.read()
+    def query(self, arg):
+        self.write(arg)
+        result = self.dev.read()
+        return result
 
     @robust
     def clear(self):  # clear the device command. Very important for Valon!

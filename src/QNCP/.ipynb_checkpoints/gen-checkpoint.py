@@ -8,6 +8,13 @@ from scipy.signal import find_peaks
 import inspect
 import vxi11
 import time
+import socket
+import serial
+import select
+from struct import unpack
+from collections import OrderedDict
+import six
+CRLF = b'\r\n'
 
 def robust(method, *arg):
     def robust_method(self, *arg):
@@ -16,7 +23,7 @@ def robust(method, *arg):
         except:
             self.dev.close()
             time.sleep(1)
-            self.dev = self.rm.open_resource(self.address)
+            self.__init__(self.address)
             result = method(self,*arg)
         return result
         
@@ -36,14 +43,17 @@ class Valon_5015:
         self.dev.read_termination = '-->'
         self.clear()
     
+    @robust
     def off(self): 
         self.write('OEN OFF;')  # turn off RF output
         self.write('PDN OFF;')  # turn off synth output
-        
+    
+    @robust
     def on(self):
         self.write('OEN ON;')  # turn on RF output
         self.write('PDN ON;');  # turn on synth output
 
+    @robust
     def freq(self,*f):  # MHz, enter or read frequency
         if bool(f) == True:   # assign value (only the first in the tuple)
             if type(f[0]) == str:
@@ -51,11 +61,11 @@ class Valon_5015:
             else:
                 self.write('Freq {} MHz;'.format(f[0]));
         else:   # when no input is entered, read actual frequency 
-            self.write('Freq?;')
-            self.__readOut = self.read()
+            self.__readOut = self.query('Freq?;')
             self.__freqAct = float(re.search('(?<=Act )\S+',self.__readOut).group())
             return self.__freqAct
 
+    @robust
     def lev(self,*l):  # MHz
         if bool(l) == True:  # assign level
             if type(l[0]) == str:
@@ -64,18 +74,26 @@ class Valon_5015:
             else:
                 self.write('PWR {};'.format(l[0]));
         else:  # when empty input, read actual level
-            self.write('PWR?;')
-            self.__readOut = self.read()
+            self.__readOut = self.query('PWR?;')
             self.__levAct = float(re.search('(?<=PWR ).*(?=\;)',self.__readOut).group())
             return self.__levAct
         
+    @robust        
     def write(self,arg):
         self.clear()    
         self.dev.write(arg)
         
-    def read(self):
-        return self.dev.read()
+    # @robust
+    # def read(self):
+    #     return self.dev.read()
 
+    @robust
+    def query(self, arg):
+        self.write(arg)
+        result = self.dev.read()
+        return result
+
+    @robust
     def clear(self):  # clear the device command. Very important for Valon!
         self.dev.clear()
 #     def close(self):
@@ -87,14 +105,10 @@ class Valon_5015:
 
 class Rigol_DSG800:
     
-    def __init__(self,address,*arg):
-        if arg:
-            self.address = address #'TCPIP::<IP ADDRESS>::INSTR'
-            self.dev = vxi11.Instrument(self.address)
-        else:
-            self.address = address 
-            self.rm = pyvisa.ResourceManager()
-            self.dev = self.rm.open_resource(self.address)
+    def __init__(self,address):
+        self.address = address 
+        self.rm = pyvisa.ResourceManager()
+        self.dev = self.rm.open_resource(self.address)
     
     @robust
     def off(self):
@@ -137,32 +151,6 @@ class Rigol_DSG800:
 #================================================================
 # Function Generator - Rigol DG4000 series
 #================================================================
-def power_vrms(v,z):
-    """
-    Calculate power using Vrms
-    Input: Vrms, impedance Z
-    Output: power (W)
-    """
-    return v**2/z
-
-def power_vpp(v,z):
-    """
-    Calculate power using Vpp
-    Input: Vpp, impedance Z
-    Output: power (W)
-    
-    """
-    return v**2/z/8
-
-def power_dbm(dbm):
-    """
-    Convert power from dBm to W
-    Input: dBm
-    Output: power (W)
-    
-    """
-    return pow(10, -3 + dbm/10)
-
 class Rigol_DG4000:
     def __init__(self,address):
         self.address = address
@@ -189,6 +177,35 @@ class Rigol_DG4000:
         else:  # turn both no
             self.dev.write(':OUTput1 ON') 
             self.dev.write(':OUTput2 ON')
+
+    @staticmethod
+    def power_vrms(v,z):
+        """
+        Calculate power using Vrms
+        Input: Vrms, impedance Z
+        Output: power (W)
+        """
+        return v**2/z
+
+    @staticmethod
+    def power_vpp(v,z):
+        """
+        Calculate power using Vpp
+        Input: Vpp, impedance Z
+        Output: power (W)
+        
+        """
+        return v**2/z/8
+
+    @staticmethod
+    def power_dbm(dbm):
+        """
+        Convert power from dBm to W
+        Input: dBm
+        Output: power (W)
+        
+        """
+        return pow(10, -3 + dbm/10)
 
     @robust        
     def __Hz(self,f):  # in Hz, support unit. Default: MHz
@@ -461,10 +478,10 @@ class Rigol_DG4000:
         """
         if inspect.ismethod(waveform) == True or inspect.isfunction(waveform) == True:
             t = np.linspace(0,signal_width,1000)
-            data = func(t,*arg)
+            data = waveform(t,*arg)
             datastring = ",".join(map(str, self.normalize(data)))
         else:
-            data = func
+            data = waveform
             datastring = ",".join(map(str, self.normalize(data)))
 
         self.dev.write('SOURCE{}:Freq {}'.format(ch, 1/signal_width))
@@ -472,8 +489,6 @@ class Rigol_DG4000:
         self.dev.write("SOURCE{}:TRACE:DATA VOLATILE,".format(ch)+ datastring)
         self.dev.write("SOURCE{}:VOLTAGE:UNIT VPP".format(ch))
         self.dev.write("SOURCE{}:VOLTAGE:AMPL {}".format(ch,2*max(data)))
-        # self.dev.write("SOURCE{}:VOLTAGE:LOW {}".format(ch,min(data)))
-        # self.dev.write("SOURCE{}:VOLTAGE:HIGH {}".format(ch,max(data)))
         self.dev.write("SOURCE{}:VOLTAGE:OFFSET 0".format(ch))
         self.dev.write("SOURCE{}:PHASE 0".format(ch))
         self.dev.write("SOURCE{}:PHASE:SYNC".format(ch))
@@ -700,7 +715,7 @@ class MOGLabs:
             self.dev.cmd('On,1')
 
     def freq(self,ch,frequency):
-        if type(f) == str:
+        if type(frequency) == str:
             self.dev.cmd('FREQ,{},{}'.format(ch,frequency))
         else:
             self.dev.cmd('FREQ,{},{} MHz'.format(ch,frequency))
@@ -726,38 +741,6 @@ class MOGLabs:
 #===========================================================================
 # Quantum Composers
 #===========================================================================
-
-def robust_quantum_composer(method, *arg):
-    def robust_method(self, *arg):
-        try:
-            result = method(self,*arg)
-        except:
-            self.dev.close()
-            time.sleep(1)
-            if bool(self.arg) == 1:
-                self.dev = self.rm.open_resource(self.address,
-                                                 baud_rate = self.baud_rate,
-                                                 data_bits = 8,
-                                                 parity = Parity.none,
-                                                 stop_bits = StopBits.one)
-                self.mux_reset()  # clear all multiplexer
-                self.lev()  # set all outputs to TTL
-                self.t_sleep = 50e-3
-                self.digit   = 11   # important! round evertying to 11 digits
-            else:
-                self.dev = self.rm.open_resource(self.address)
-                self.mux_reset()   # clear all multiplexer
-                self.lev()    # set all outputs to TTL
-                self.dev.clear()
-                self.t_sleep = 50e-3
-                self.digit   = 11   # important! round evertying to 11 digits
-            result = method(self,*arg)
-        return result
-        
-    robust_method.__name__ = method.__name__
-    robust_method.__doc__ = method.__doc__
-    robust_method.__module__ = method.__module__
-    return robust_method
 
 def sleep_method(method, *arg):
     t_sleep = 50e-3
@@ -806,13 +789,13 @@ class Quantum_Composers:
             return round(x,digit)
         
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def t0(self,t):  # clock T0
         t = self.rd(t)
         self.dev.write(':PULSE0:PER {}'.format(t))
     
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def norm(self,*ch):   # normal mode, no wait
         if bool(ch) == True:  # specified channel
             for __ch in ch:
@@ -826,36 +809,36 @@ class Quantum_Composers:
                 self.dev.write(':Pulse0:MODe NORMal')
                 
     @sleep_method   
-    @robust_quantum_composer
+    @robust
     def wid(self,ch,w):
         w = self.rd(w)
         self.dev.write(':PULSE{}:WIDth {}'.format(ch,w))
         
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def dly(self,ch,d):
         d = self.rd(d)
         self.dev.write(':PULSE{}:DELay {}'.format(ch,d))
         
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def pol(self,ch,p):
         self.dev.write(':PULSE{}:POL {}'.format(ch,p))
         
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def wcount(self,ch,w):  # wait number of T0 before enable output       
         self.dev.write(':PULSE{}:WCOunter {}'.format(ch,w))
         
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def dcycl(self,ch,on,off):   # channel duty cycle
         self.dev.write(':Pulse{}:CMODe DCYCLe'.format(ch))
         self.dev.write(':PULSE{}:PCOunter {}'.format(ch,on))
         self.dev.write(':PULSE{}:OCOunter {}'.format(ch,off))
         
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def lev(self,*p):    # set the output amplitude of a channel
         if bool(p) == True:  # adjustbale
             __ch = p[0]
@@ -871,7 +854,7 @@ class Quantum_Composers:
                 self.lev(__ch)
                 
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def mux(self,*p):  ## multiplexer
         if bool(p) == True:
             __ch = p[0]
@@ -884,13 +867,13 @@ class Quantum_Composers:
             self.mux_reset()
             
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def mux_reset(self):   # reset multiplexer
         for n in range(1,9): 
             self.mux(n,n)
             
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def on(self,*ch):
         if bool(ch) == True:
             for channel in ch:
@@ -899,7 +882,7 @@ class Quantum_Composers:
             self.dev.write(':PULSE0:STAT ON')
             
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def off(self,*ch):
         if bool(ch) == True:
             for channel in ch:
@@ -907,7 +890,7 @@ class Quantum_Composers:
         else:
             self.dev.write(':PULSE0:STAT OFF')
 
-    @robust_quantum_composer
+    @robust
     def trigOn(self):  # system mode: triggered
         self.off()
         self.dev.write(':PULSE0:TRIG:MOD TRIG')  # trig enabled 
@@ -915,32 +898,32 @@ class Quantum_Composers:
         self.dev.write('*TRG')  # software trigger
 
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def cw(self): # continuous running mode
         self.dev.write(':PULSE0:TRIG:MOD DIS')  # trig disabled 
         
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def trigOff(self):
         self.off()
         self.dev.write(':PULSE0:TRIG:MOD TRIG')  # trig enabled 
     
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def high(self,*ch):  ## keep output constantly at +5V
         for c in ch:
             self.dev.write(':PULSE{}:POL INV'.format(c))
             self.off(c)
             
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def low(self,*ch):  ## keep output constantly at 0V
         for c in ch:
             self.dev.write(':PULSE{}:POL NORM'.format(c))
             self.off(c)
             
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def __exp(self,T0,ch,pol,tExp,tPls,tDly,nPls,nDly):  # experiment mode
         T0 = self.rd(T0)
         tExp = self.rd(tExp)
@@ -957,7 +940,7 @@ class Quantum_Composers:
         self.on(ch)
         
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def config(self,cfg):   # preset configuration
         if re.search('(cal)', cfg, re.IGNORECASE)!= None:   # cavity calibration
             self.mux_reset()
@@ -972,10 +955,17 @@ class Quantum_Composers:
             self.off(0,1,2,3,4,5,6,7,8)
             
     @sleep_method
-    @robust_quantum_composer
+    @robust
     def burst(self, ch, n_pulses):
         self.dev.write(':PULSe{}:CMOD BURS'.format(ch))
         self.dev.write(':PULSe{}:BCOunter {}'.format(ch,n_pulses))
+
+    @sleep_method
+    @robust
+    def DC(self, ch, offset):
+        self.high(ch)
+        self.lev(ch, offset)
+
 
 #================================================================
 # Agilent ESG Signal Generator Family
@@ -996,17 +986,11 @@ class Agilent_ESG_SG:
     
     @robust
     def off(self):
-        if int(self.dev.query('OUTput?')) == 1: # turn single output off
-            self.dev.write(':OUTput OFF')  
-        else:  # it is already off
-            print('I am already off')
+        self.dev.write(':OUTput OFF')
     
     @robust        
     def on(self):
-        if int(self.dev.query('OUTput?')) == 0: # turn single output off
-            self.dev.write(':OUTput ON')  
-        else:  # it is already off
-            print('I am already on')
+        self.dev.write(':OUTput ON')  
 
     @robust        
     def freq(self,f): #define frequency and unit (Hz,kHz,MHz,GHz...)
@@ -1031,7 +1015,7 @@ class Agilent_ESG_SG:
 #================================================================
 
 class tektronix_AFG3000:
-    def __init__(self,address,*arg):
+    def __init__(self,address):
         self.address = address 
         self.rm = pyvisa.ResourceManager()
         self.dev = self.rm.open_resource(self.address)

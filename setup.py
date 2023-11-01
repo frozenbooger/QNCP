@@ -3,7 +3,7 @@ import os, sys, pathlib
 
 setup(
     name='QNCP',
-    version='1.11',
+    version='1.11.4',
     license='MIT',
     author="Leonardo Castillo Veneros and Guodong Cui",
     author_email='frozenbooger@gmail.com',

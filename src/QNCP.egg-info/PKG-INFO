@@ -1,12 +1,14 @@
 Metadata-Version: 2.1
 Name: QNCP
-Version: 1.11
+Version: 1.11.4
 Summary: UNKNOWN
 Home-page: https://github.com/frozenbooger/QNCP
 Author: Leonardo Castillo Veneros and Guodong Cui
 Author-email: frozenbooger@gmail.com
 License: MIT
-Description: UNKNOWN
-Keywords: Quantum Network Control Panel
+Keywords: Quantum Network Control Protocol Suite
 Platform: UNKNOWN
 Provides-Extra: crystal fitting
+
+UNKNOWN
+

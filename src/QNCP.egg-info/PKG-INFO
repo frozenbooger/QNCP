@@ -1,14 +1,21 @@
 Metadata-Version: 2.1
 Name: QNCP
-Version: 1.11.4
-Summary: UNKNOWN
+Version: 1.11.6
 Home-page: https://github.com/frozenbooger/QNCP
 Author: Leonardo Castillo Veneros and Guodong Cui
 Author-email: frozenbooger@gmail.com
 License: MIT
 Keywords: Quantum Network Control Protocol Suite
-Platform: UNKNOWN
-Provides-Extra: crystal fitting
-
-UNKNOWN
-
+Requires-Dist: matplotlib
+Requires-Dist: numpy
+Requires-Dist: numpydoc
+Requires-Dist: paramiko
+Requires-Dist: pyvis
+Requires-Dist: PyVISA
+Requires-Dist: PyVISA-py
+Requires-Dist: regex
+Requires-Dist: scipy
+Requires-Dist: scikit-learn
+Requires-Dist: scp
+Requires-Dist: visa
+Requires-Dist: python-vxi11

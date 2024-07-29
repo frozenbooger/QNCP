@@ -601,6 +601,53 @@ class thorlabs_polarimeter:
         self.dev.write('SENS:POW:RANG:AUTO {}'.format(state))
         
         
+#===========================================================================
+# Power Meter - Thorlabs
+#=========================================================================== 
+
+class thorlabs_powermeter:
+    def __init__(self,address):
+        """ 
+        Description: The initialization of the power meter class 
+        will initialize a singular device using its VISA USB address
+
+        Input: VISA address : string
+        Output: device object with all its methods : class object
+        Example: 
+        >>thorlabs_powermeter('USB::0x1234::125::A22-5::INSTR')
+
+        thorlabs_powermeter.class.object...
+        """
+        self.address = address
+        self.rm = pyvisa.ResourceManager()
+        self.dev = self.rm.open_resource(self.address)
+        
+    @robust
+    def set_wavelength(self,wavelength):
+        """ 
+        Description: sets wavelength
+
+        Input: wavelength : float
+        Output: None : None
+        Example: 
+        >>set_wavelength(795)
+
+        """
+        self.dev.write('SENSe:CORRection:WAVelength {}'.format(wavelength))
+
+    @robust
+    def read_power(self):
+        """ 
+        Description: reads power
+
+        Input: None : None
+        Output: None : None
+        Example: 
+        >>read_power()
+
+        """
+        self.dev.query('READ?')
+
 #================================================================
 # Single Quantum SNSPD
 #================================================================ 

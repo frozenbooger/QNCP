@@ -283,6 +283,44 @@ class Rigol_DS1000z:
         return time_data, volt_data
     
     @robust
+    def take_data(self, ch, mdepth=12000000):
+        self.dev.write(':ACQuire:MDEPth {}'.format(mdepth))      # configurable memory depth
+        self.dev.write(":WAV:SOUR CHAN{}".format(ch))
+        self.dev.write(":WAV:MODE RAW")                 # full memory, not screen
+        self.dev.write(":WAV:FORM BYTE")                # faster than ASC
+
+        # RAW mode requires scope to be stopped
+        self.stop()
+
+        # get scaling info from preamble
+        pre = self.dev.query(":WAVeform:PREamble?").split(',')
+        xi  = float(pre[4])   # time per sample
+        x0  = float(pre[5])   # time origin
+        yi  = float(pre[7])   # volts per ADC step
+        yo  = float(pre[8])   # voltage origin
+        yr  = float(pre[9])   # ADC reference
+
+        # chunked download (scope maxes out at ~250k points per read)
+        total = int(pre[2])
+        chunk = 250000
+        raw   = []
+
+        for start in range(1, total + 1, chunk):
+            stop = min(start + chunk - 1, total)
+            self.dev.write(":WAVeform:STARt {}".format(start))
+            self.dev.write(":WAVeform:STOP {}".format(stop))
+            data = self.dev.query_binary_values(
+                ":WAVeform:DATA?", datatype='B', is_big_endian=False
+            )
+            raw.extend(data)
+
+        raw       = np.array(raw, dtype=np.float64)
+        volt_data = (raw - yr) * yi - yo
+        time_data = x0 + xi * np.arange(len(raw))
+
+        return time_data, volt_data
+    
+    @robust
     def scale_offset(self, ch, scale, offset):
         """ 
         Description: The scale_offset function sets the scale and offset parameters of an 

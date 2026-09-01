@@ -11,3 +11,5 @@ scikit-learn
 scp
 visa
 python-vxi11
+py-xdrlib
+pyserial

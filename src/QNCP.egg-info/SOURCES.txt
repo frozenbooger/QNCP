@@ -1,5 +1,5 @@
+LICENSE
 README.md
-setup.cfg
 setup.py
 src/QNCP.egg-info/PKG-INFO
 src/QNCP.egg-info/SOURCES.txt

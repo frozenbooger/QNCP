@@ -3,7 +3,7 @@ import os, sys, pathlib
 
 setup(
     name='QNCP',
-    version='1.11.6',
+    version='1.11.7',
     license='MIT',
     author="Leonardo Castillo Veneros and Guodong Cui",
     author_email='frozenbooger@gmail.com',
@@ -24,7 +24,9 @@ setup(
         'scikit-learn',
         'scp',
         'visa',
-        'python-vxi11'],
+        'python-vxi11',
+        'py-xdrlib',
+        'pyserial'],
     package_data={os.path.join('src','qncp'):['*.dll','qncp/dependencies/*']},
     data_files = [('dlls',[os.path.join('src','qncp','dependencies','tdcbase_64bit.dll'),os.path.join('src','qncp','dependencies','FTD3XX.dll'),os.path.join('src','qncp','dependencies','libusb0.dll')])],
     zip_safe=False

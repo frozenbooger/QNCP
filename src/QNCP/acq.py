@@ -283,40 +283,231 @@ class Rigol_DS1000z:
         return time_data, volt_data
     
     @robust
-    def take_data(self, ch, mdepth=12000000):
-        self.dev.write(':ACQuire:MDEPth {}'.format(mdepth))      # configurable memory depth
-        self.dev.write(":WAV:SOUR CHAN{}".format(ch))
-        self.dev.write(":WAV:MODE RAW")                 # full memory, not screen
-        self.dev.write(":WAV:FORM BYTE")                # faster than ASC
+    def take_data(self, channels, mdepth=None, chunk=250_000):
+        """
+        Read one or more analog channels from the same acquisition
+        on a Rigol DS1000Z / MSO1000Z oscilloscope.
 
-        # RAW mode requires scope to be stopped
+        Parameters
+        ----------
+        channels : int or iterable of int
+            Channel number(s) to read.
+
+            Examples:
+                1
+                [1, 2]
+                [1, 2, 3, 4]
+
+        mdepth : int, str, or None
+            Memory depth.
+
+            Common DS1000Z values depend on how many channels are enabled:
+
+                1 channel:
+                    12k, 120k, 1.2M, 12M, 24M
+
+                2 channels:
+                    6k, 60k, 600k, 6M, 12M
+
+                3-4 channels:
+                    3k, 30k, 300k, 3M, 6M
+
+            If None, the current scope setting is preserved.
+
+        chunk : int
+            Number of points per waveform transfer.
+
+            DS1000Z maximum in BYTE mode is 250000.
+
+        Returns
+        -------
+        time_data : np.ndarray
+            Common time axis.
+
+        volt_data : np.ndarray or dict
+            For one channel:
+                returns an ndarray.
+
+            For multiple channels:
+                returns a dictionary indexed by channel number.
+
+        Examples
+        --------
+        t, v = scope.take_data(1)
+
+        t, data = scope.take_data([1, 2])
+        v1 = data[1]
+        v2 = data[2]
+        """
+
+        # ------------------------------------------------------------
+        # Normalize channel argument
+        # ------------------------------------------------------------
+
+        single_channel = isinstance(channels, (int, np.integer))
+
+        if single_channel:
+            channels = [int(channels)]
+        else:
+            channels = [int(ch) for ch in channels]
+
+        if len(channels) == 0:
+            raise ValueError("At least one channel must be specified.")
+
+        for ch in channels:
+            if ch not in (1, 2, 3, 4):
+                raise ValueError(
+                    f"Invalid DS1000Z channel: {ch}. "
+                    "Channels must be 1, 2, 3, or 4."
+                )
+
+        # ------------------------------------------------------------
+        # Set acquisition memory depth if requested
+        # ------------------------------------------------------------
+
+        if mdepth is not None:
+            self.dev.write(f":ACQuire:MDEPth {mdepth}")
+
+        # ------------------------------------------------------------
+        # Freeze acquisition
+        #
+        # RAW waveform memory can only be accessed while STOPPED.
+        #
+        # We stop ONCE before reading any channels so every channel
+        # comes from the same trigger/acquisition.
+        # ------------------------------------------------------------
+
         self.stop()
 
-        # get scaling info from preamble
-        pre = self.dev.query(":WAVeform:PREamble?").split(',')
-        xi  = float(pre[4])   # time per sample
-        x0  = float(pre[5])   # time origin
-        yi  = float(pre[7])   # volts per ADC step
-        yo  = float(pre[8])   # voltage origin
-        yr  = float(pre[9])   # ADC reference
+        self.dev.write(":WAVeform:MODE RAW")
+        self.dev.write(":WAVeform:FORMat BYTE")
 
-        # chunked download (scope maxes out at ~250k points per read)
-        total = int(pre[2])
-        chunk = 250000
-        raw   = []
+        time_data = None
+        volt_data = {}
 
-        for start in range(1, total + 1, chunk):
-            stop = min(start + chunk - 1, total)
-            self.dev.write(":WAVeform:STARt {}".format(start))
-            self.dev.write(":WAVeform:STOP {}".format(stop))
-            data = self.dev.query_binary_values(
-                ":WAVeform:DATA?", datatype='B', is_big_endian=False
+        # ------------------------------------------------------------
+        # Read channels sequentially from frozen acquisition memory
+        # ------------------------------------------------------------
+
+        for ch in channels:
+
+            self.dev.write(f":WAVeform:SOURce CHANnel{ch}")
+
+            # --------------------------------------------------------
+            # Preamble:
+            #
+            # 0  format
+            # 1  type
+            # 2  points
+            # 3  count
+            # 4  xincrement
+            # 5  xorigin
+            # 6  xreference
+            # 7  yincrement
+            # 8  yorigin
+            # 9  yreference
+            # --------------------------------------------------------
+
+            pre = self.dev.query(":WAVeform:PREamble?").split(",")
+
+            total = int(float(pre[2]))
+
+            xi = float(pre[4])
+            x0 = float(pre[5])
+            xr = float(pre[6])
+
+            yi = float(pre[7])
+            yo = float(pre[8])
+            yr = float(pre[9])
+
+            # --------------------------------------------------------
+            # Allocate array once rather than repeatedly extending
+            # a Python list.
+            # --------------------------------------------------------
+
+            raw = np.empty(total, dtype=np.uint8)
+
+            # --------------------------------------------------------
+            # Download waveform in chunks
+            # --------------------------------------------------------
+
+            for start in range(1, total + 1, chunk):
+
+                stop = min(start + chunk - 1, total)
+
+                self.dev.write(f":WAVeform:STARt {start}")
+                self.dev.write(f":WAVeform:STOP {stop}")
+
+                block = self.dev.query_binary_values(
+                    ":WAVeform:DATA?",
+                    datatype="B",
+                    is_big_endian=False,
+                    container=np.array,
+                )
+
+                expected = stop - start + 1
+
+                if len(block) != expected:
+                    raise RuntimeError(
+                        f"CH{ch}: expected {expected} samples "
+                        f"but received {len(block)}."
+                    )
+
+                raw[start - 1:stop] = block
+
+            # --------------------------------------------------------
+            # Convert ADC codes -> volts
+            #
+            # Rigol DS1000Z formula:
+            #
+            # V = (raw - Yorigin - Yreference) * Yincrement
+            # --------------------------------------------------------
+
+            volt_data[ch] = (
+                raw.astype(np.float64)
+                - yo
+                - yr
+            ) * yi
+
+            # --------------------------------------------------------
+            # Construct the time axis
+            #
+            # DS1000Z reports Xreference = 0, but include it anyway
+            # so the expression follows the preamble definition.
+            # --------------------------------------------------------
+
+            t = (
+                x0
+                + (
+                    np.arange(total, dtype=np.float64)
+                    - xr
+                ) * xi
             )
-            raw.extend(data)
 
-        raw       = np.array(raw, dtype=np.float64)
-        volt_data = (raw - yr) * yi - yo
-        time_data = x0 + xi * np.arange(len(raw))
+            if time_data is None:
+                time_data = t
+
+            else:
+                # Channels from the same acquisition should share
+                # the same horizontal sampling.
+                if len(t) != len(time_data):
+                    raise RuntimeError(
+                        f"CH{ch} returned {len(t)} samples, "
+                        f"while the first channel returned "
+                        f"{len(time_data)} samples."
+                    )
+
+                if not np.isclose(xi, time_data[1] - time_data[0]):
+                    raise RuntimeError(
+                        f"CH{ch} has a different sample interval."
+                    )
+
+        # ------------------------------------------------------------
+        # Preserve old single-channel behavior
+        # ------------------------------------------------------------
+
+        if single_channel:
+            return time_data, volt_data[channels[0]]
 
         return time_data, volt_data
     
@@ -444,7 +635,186 @@ class Rigol_DMO5000:
         time_data = np.arange(0,t*len(volt_data),t)
 
         return time_data[0:len(volt_data)], volt_data
-    
+
+    @robust
+    def take_data(
+        self,
+        channels,
+        mdepth=None,
+        chunk=250_000,
+    ):
+        """
+        Read one or more analog channels from the same oscilloscope acquisition.
+
+        Parameters
+        ----------
+        channels : int or iterable of int
+            Channel number(s) to read.
+            Examples:
+                1
+                [1, 2]
+                [1, 2, 3, 4]
+
+        mdepth : int or str or None
+            Acquisition memory depth.
+            If None, leave the scope's current memory depth unchanged.
+
+        chunk : int
+            Number of waveform points requested per transfer.
+
+        Returns
+        -------
+        time_data : np.ndarray
+            Common time axis for all channels.
+
+        volt_data : np.ndarray or dict
+            If one channel was requested:
+                volt_data is an ndarray.
+
+            If multiple channels were requested:
+                volt_data[channel] gives that channel's waveform.
+        """
+
+        # Allow either:
+        #     take_data(1)
+        # or:
+        #     take_data([1, 2, 3])
+        single_channel = isinstance(channels, (int, np.integer))
+
+        if single_channel:
+            channels = [int(channels)]
+        else:
+            channels = [int(ch) for ch in channels]
+
+        if len(channels) == 0:
+            raise ValueError("At least one channel must be specified.")
+
+        # Memory depth is an acquisition setting.
+        # Leave it unchanged if mdepth=None.
+        if mdepth is not None:
+            self.dev.write(f":ACQuire:MDEPth {mdepth}")
+
+        # RAW waveform memory can only be read while stopped.
+        #
+        # This is important for multiple channels:
+        # stop ONCE so all channels come from the same acquisition.
+        self.stop()
+
+        self.dev.write(":WAVeform:MODE RAW")
+        self.dev.write(":WAVeform:FORMat BYTE")
+
+        time_data = None
+        volt_data = {}
+
+        for ch in channels:
+
+            # Select the waveform source.
+            self.dev.write(f":WAVeform:SOURce CHANnel{ch}")
+
+            # ------------------------------------------------------------
+            # Read waveform preamble for this channel
+            #
+            # Rigol preamble:
+            #
+            # 0  format
+            # 1  type
+            # 2  points
+            # 3  count
+            # 4  xincrement
+            # 5  xorigin
+            # 6  xreference
+            # 7  yincrement
+            # 8  yorigin
+            # 9  yreference
+            # ------------------------------------------------------------
+
+            pre = self.dev.query(":WAVeform:PREamble?").split(",")
+
+            total = int(float(pre[2]))
+
+            xi = float(pre[4])
+            x0 = float(pre[5])
+            xr = float(pre[6])
+
+            yi = float(pre[7])
+            yo = float(pre[8])
+            yr = float(pre[9])
+
+            # ------------------------------------------------------------
+            # Download raw waveform in chunks
+            # ------------------------------------------------------------
+
+            raw = np.empty(total, dtype=np.uint8)
+
+            for start in range(1, total + 1, chunk):
+
+                stop = min(start + chunk - 1, total)
+
+                self.dev.write(f":WAVeform:STARt {start}")
+                self.dev.write(f":WAVeform:STOP {stop}")
+
+                block = self.dev.query_binary_values(
+                    ":WAVeform:DATA?",
+                    datatype="B",
+                    is_big_endian=False,
+                )
+
+                block = np.asarray(block, dtype=np.uint8)
+
+                expected = stop - start + 1
+
+                if len(block) != expected:
+                    raise RuntimeError(
+                        f"CH{ch}: expected {expected} points "
+                        f"but received {len(block)}."
+                    )
+
+                raw[start - 1:stop] = block
+
+            # ------------------------------------------------------------
+            # Convert ADC values -> volts
+            #
+            # Rigol:
+            #
+            # V = (raw - Yorigin - Yreference) * Yincrement
+            # ------------------------------------------------------------
+
+            raw_float = raw.astype(np.float64)
+
+            volt_data[ch] = (
+                raw_float
+                - yo
+                - yr
+            ) * yi
+
+            # ------------------------------------------------------------
+            # Construct common time axis
+            #
+            # t[n] = Xorigin + (n - Xreference) * Xincrement
+            # ------------------------------------------------------------
+
+            if time_data is None:
+
+                time_data = (
+                    x0
+                    + (np.arange(total, dtype=np.float64) - xr) * xi
+                )
+
+            else:
+                # All analog channels from the same acquisition
+                # should have the same horizontal sampling.
+                if total != len(time_data):
+                    raise RuntimeError(
+                        f"CH{ch} has {total} points, "
+                        f"but the first channel had {len(time_data)}."
+                    )
+
+        # Preserve the convenient old behavior for a single channel.
+        if single_channel:
+            return time_data, volt_data[channels[0]]
+
+        return time_data, volt_data
+
     @robust
     def scale_offset(self, ch, scale, offset):
         """ 

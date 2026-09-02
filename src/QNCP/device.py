@@ -3,7 +3,9 @@ from pyvisa.constants import Parity,StopBits
 import numpy as np
 import matplotlib.pyplot as plt
 import re
+import functools
 import math
+import time
 from scipy.signal import find_peaks
 import inspect
 import vxi11
@@ -534,23 +536,21 @@ class Rigol_DS1102Z_E:
 #===========================================================================
 # Quantum_Composer (1.0 tested)
 #===========================================================================
-def sleep_method(method, *args, **kws):
+def sleep_method(method):
     t_sleep = 50e-3
-    def sleeping_method(method, *args, **kws):
-        method(*args, **kws)
+    @functools.wraps(method)
+    def wrapper(*args, **kwargs):
+        result = method(*args, **kwargs)
         time.sleep(t_sleep)
-        
-    sleeping_method.__name__ = method.__name__
-    sleeping_method.__doc__ = method.__doc__
-    sleeping_method.__module__ = method.__module__
-    return sleeping_method
+        return result
+    return wrapper
 
 class Quantum_Composers:
     @sleep_method
     def __init__(self,address,*arg):
         if arg:
             self.address = address
-            self.baud_rate = arg
+            self.baud_rate = arg[0]
             self.rm = pyvisa.ResourceManager()
             self.dev = self.rm.open_resource(address, # same as 'ASRL5::INSTR'
                                   baud_rate = self.baud_rate, # must identify
@@ -771,7 +771,7 @@ class Quantum_Composers:
             self.__exp(__T0,8,'NORM',__tExp,0.000050,__tResp,1000,30000)
             self.on(1,2,5,6,8)
     @sleep_method
-    def burst(ch, n_pulses):
+    def burst(self, ch, n_pulses):
         self.lev(self,ch)
         self.pol(self,ch,'NORM')
         self.norm(self,ch)
@@ -780,7 +780,33 @@ class Quantum_Composers:
         self.dev.write(':PULSe{}:CMOD BURS'.format(ch))
         time.sleep(self.t_sleep)
         self.dev.write(':PULSe{}:BCOunter {}'.format(ch,n_pulses))
-        
+    @sleep_method
+    def clear_buffer(self, silent=True):
+        """Clear stale 'ok' responses left in the buffer."""
+        drained = 0
+        while True:
+            try:
+                self.dev.read()
+                drained += 1
+            except:
+                break
+        if not silent:
+            print(f"Drained {drained} stale responses")
+    @sleep_method
+    def read_value(self, value_cmd: str, silent=True) -> str:
+        """Read a value from the device. See page 34 in
+        https://www.quantumcomposers.com/hubfs/Documents/Manuals/9520%20Operators%20Manual.pdf?hsLang=en
+        for a list of usable commands."""
+        self.clear_buffer(silent=silent)
+        try:
+            self.dev.write(value_cmd)
+        except Exception as e:
+            if not silent:
+                print(f"Warning: Exception received -> {e}")
+            print("Warning: Invalid command")
+            return None
+        response = self.dev.read()
+        return repr(response)
 
 #================================================================
 # Rigol_DSA832 Spectrum Analyzer ()
